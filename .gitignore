@@ -1,0 +1,9 @@
+*.mp4
+*.webm
+.DS_Store
+node_modules/
+_ref/
+_cad/
+_shots/
+_frames/
+*.tmp
