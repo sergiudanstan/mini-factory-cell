@@ -34,7 +34,7 @@ The aim is **realism**: real equipment sizes, colours and timings (RNA feeders, 
 **In a dial nest** the housing bottom is at `HB = 0.212` (nest top 0.220, pocket 8 mm). Each part's origin is its **bottom centre** with z up and the key along +x.
 
 **Defects (planned):**
-- Assembly 8 has a weak spring (0.45 N/mm). It reads 2.0 N at 4.5 mm and S4 rejects it.
+- Assembly 8 has a weak spring (0.45 N/mm). It reads 2.4 N at 4.5 mm (good parts 4.0 N) and S4 rejects it.
 - Assembly 15 has one hook that does not latch. The cap sits 1.6 mm high and tilted 4.2°, and S5 rejects it.
 
 ## 3. Layout (cell frame)
@@ -213,4 +213,6 @@ Hooks:
 
 Views: `hall iso front top bowls feederA dial delta press vision scara tray`.
 
-Headless Chrome needs `--use-gl=angle --use-angle=gl-egl` for hardware WebGL (Intel iGPU). The tools set this. **Run at most one Chrome at a time** (about 3 GB of RAM is free).
+Headless Chrome renders on the NVIDIA RTX 5050 through ANGLE on Vulkan (`--use-angle=vulkan --disable-vulkan-surface`). If that fails, the tools fall back to EGL and then to SwiftShader, and print the WebGL renderer string. Headless rAF is capped at 60 Hz, so pass `--uncapped` to measure the real fps headroom.
+
+**One Chrome at a time:** every tool run waits for the machine-wide lock `/tmp/mfc-chrome.lock` (several agents share about 3 GB of free RAM). Never start Chrome any other way.
