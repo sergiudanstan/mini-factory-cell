@@ -120,7 +120,7 @@ const CHECK = { t: 0.10 };
 // and the delta holds housing 6 over S1. Two planned rejects: a weak spring (S4) and a cap whose hook did not latch (S5).
 const NC = 27;                                          // dial cycles in the film
 const DEFECTS = {
-  8: { kind: "spring", k: 450, station: 4, text: "Weak spring: S4 force 2.0 N at 4.5 mm (window 3.0-4.5 N)" },
+  8: { kind: "spring", k: 450, station: 4, text: "Weak spring: S4 force 2.4 N at 4.5 mm (window 3.0-4.5 N)" },
   15: { kind: "hook", hooks: 1, tilt: 4.2, rise: 0.0016, station: 5, text: "Cap tilt 4.2°, one hook not latched (S5)" },
 };
 const nestOf = (a) => (((6 - a) % 8) + 8) % 8;          // nest n sits at station ((n + c) mod 8) + 1 in cycle c

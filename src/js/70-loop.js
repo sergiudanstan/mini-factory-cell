@@ -35,9 +35,6 @@ function setMode(m) {
 document.querySelectorAll(".mode-switch button").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
 function setHall(on) { HALL.root.children.forEach((o) => { if (o !== HALL.floor) o.visible = !!on; }); }
 if (QS.get("hall") === "0") { $("hallbox").checked = false; setHall(false); }
-// ?solo=<module>: only that module (tools/stats.mjs, module screenshots)
-const SOLO = QS.get("solo");
-if (SOLO && MODULES[SOLO]) for (const [k, g] of Object.entries(MODULES)) g.visible = k === SOLO || (k === "hall" && false);
 
 // ---------------------------------------------------------------- tracked parts: one InstancedMesh per part type
 // A component's world pose follows its track keyframes (feeder nest, delta gripper, fall, dial nest, reject unit, bin,
@@ -62,6 +59,9 @@ function rebuildTracked() {
   }
 }
 rebuildTracked();
+// ?solo=<module>: only that module (tools/stats.mjs, module screenshots). Runs after every module root exists.
+const SOLO = QS.get("solo");
+if (SOLO && MODULES[SOLO]) for (const [k, g] of Object.entries(MODULES)) g.visible = k === SOLO;
 const _pm = new THREE.Matrix4(), _pq = new THREE.Quaternion(), _pq2 = new THREE.Quaternion(), _pe = new THREE.Euler(), _pp = new THREE.Vector3(), _ps = new THREE.Vector3(), _pz = V(0, 0, 1);
 function keyAt(track, t) { let k = null; for (const e of track) { if (e.t <= t + 1e-9) k = e; else break; } return k; }
 function partPose(p, t, dp, tp) {   // -> { x, y, z (bottom), yaw, tilt, rot?, len } or null when not in the scene
