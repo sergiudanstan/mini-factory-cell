@@ -1816,40 +1816,217 @@ const LAYOUT = (() => {
   };
 })();
 // ---------------------------------------------------------------- product: push-button parts (housing A, spring B, cap C)
-// M0 STUB (owner: product task). Contract, fixed:
-//   makePart(type, lod = 0) -> THREE.Group, origin at the part's bottom centre, z up, key feature along +x.
-//                              lod 0 = close-up detail, 1 = normal, 2 = far / instanced flow parts.
-//   prodGeometry(type, lod) -> { geo, mat }[]: the same part as plain geometries (for InstancedMesh in other modules).
-//   setSpringLength(obj, len)  scales a spring made by makePart("B") to length len (m), keeping the wire size.
-//   PROD_MAT: { A, B, C } materials.
+// Keep the local coordinates in the part frame, origin at the bottom centre with z up.
 const PROD_MAT = { A: M.pa66Black, B: M.musicWire, C: M.paRed };
 const prodGeoCache = new Map();
+
+function prodQuad(vertices, a, b, c, d, reverse = false) {
+  const points = reverse ? [a, d, c, a, c, b] : [a, b, c, a, c, d];
+  for (const p of points) vertices.push(...p);
+}
+
+function prodWallPoint(r, a, z) {
+  return [r * Math.cos(a), r * Math.sin(a), z];
+}
+
+function aWindowedWall() {
+  const outerR = PART.A.d / 2, innerR = PART.A.bore / 2;
+  const z0 = 0.004, z1 = 0.020, zLow = PART.A.windows[0], zHigh = PART.A.windows[1];
+  const segments = 80, halfAngle = Math.asin(0.002 / outerR);
+  const centers = [Math.PI / 2, -Math.PI / 2];
+  const vertices = [];
+  const inWindow = (a) => centers.some((center) => Math.abs(Math.atan2(Math.sin(a - center), Math.cos(a - center))) < halfAngle);
+  const angles = Array.from({ length: segments + 1 }, (_, i) => (Math.PI * 2 * i) / segments);
+  const heights = [z0, zLow, zHigh, z1];
+
+  for (let band = 0; band < heights.length - 1; band++) {
+    const za = heights[band], zb = heights[band + 1], cutBand = za >= zLow && zb <= zHigh;
+    for (let i = 0; i < segments; i++) {
+      const a = angles[i], b = angles[i + 1], mid = (a + b) / 2;
+      if (cutBand && inWindow(mid)) continue;
+      prodQuad(vertices, prodWallPoint(outerR, a, za), prodWallPoint(outerR, b, za), prodWallPoint(outerR, b, zb), prodWallPoint(outerR, a, zb));
+      prodQuad(vertices, prodWallPoint(innerR, a, za), prodWallPoint(innerR, a, zb), prodWallPoint(innerR, b, zb), prodWallPoint(innerR, b, za));
+    }
+  }
+
+  for (const center of centers) {
+    const a0 = center - halfAngle, a1 = center + halfAngle;
+    for (const z of [zLow, zHigh]) {
+      prodQuad(vertices, prodWallPoint(innerR, a0, z), prodWallPoint(outerR, a0, z), prodWallPoint(outerR, a1, z), prodWallPoint(innerR, a1, z), z === zLow);
+    }
+    for (const a of [a0, a1]) {
+      prodQuad(vertices, prodWallPoint(innerR, a, zLow), prodWallPoint(innerR, a, zHigh), prodWallPoint(outerR, a, zHigh), prodWallPoint(outerR, a, zLow));
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function aHousingGeometry(lod = 1) {
+  if (lod === 2) {
+    const seg = 12, outerR = PART.A.d / 2, innerR = PART.A.bore / 2;
+    const outer = new THREE.CylinderGeometry(outerR, outerR, PART.A.h - PART.A.flangeH, seg, 1, true);
+    outer.rotateX(Math.PI / 2);
+    outer.translate(0, 0, (PART.A.h - PART.A.flangeH) / 2);
+    const inner = new THREE.CylinderGeometry(innerR, innerR, PART.A.h - PART.A.boreFloor - PART.A.flangeH, seg, 1, true);
+    inner.rotateX(Math.PI / 2);
+    inner.translate(0, 0, PART.A.boreFloor + (PART.A.h - PART.A.boreFloor - PART.A.flangeH) / 2);
+    inner.scale(-1, 1, 1);
+    inner.computeVertexNormals();
+    const bottom = new THREE.CylinderGeometry(outerR, outerR, PART.A.boreFloor, seg);
+    bottom.rotateX(Math.PI / 2);
+    bottom.translate(0, 0, PART.A.boreFloor / 2);
+    const flangeR = PART.A.flangeD / 2;
+    const flangeWall = new THREE.CylinderGeometry(flangeR, flangeR, PART.A.flangeH, seg, 1, true);
+    flangeWall.rotateX(Math.PI / 2);
+    flangeWall.translate(0, 0, PART.A.h - PART.A.flangeH / 2);
+    const flangeBore = new THREE.CylinderGeometry(innerR, innerR, PART.A.flangeH, seg, 1, true);
+    flangeBore.rotateX(Math.PI / 2);
+    flangeBore.translate(0, 0, PART.A.h - PART.A.flangeH / 2);
+    flangeBore.scale(-1, 1, 1);
+    flangeBore.computeVertexNormals();
+    const flangeTop = new THREE.RingGeometry(innerR, flangeR, seg);
+    flangeTop.translate(0, 0, PART.A.h);
+    const flangeBottom = new THREE.RingGeometry(innerR, flangeR, seg);
+    flangeBottom.rotateX(Math.PI);
+    flangeBottom.translate(0, 0, PART.A.h - PART.A.flangeH);
+    return [outer, inner, bottom, flangeWall, flangeBore, flangeTop, flangeBottom].map((geo) => ({ geo, mat: PROD_MAT.A }));
+  }
+
+  const wall = aWindowedWall();
+  const bottom = new THREE.CylinderGeometry(PART.A.d / 2, PART.A.d / 2, 0.004, 40);
+  bottom.rotateX(Math.PI / 2);
+  bottom.translate(0, 0, 0.002);
+
+  const outerR = PART.A.flangeD / 2, innerR = PART.A.bore / 2;
+  const z0 = PART.A.h - PART.A.flangeH, z1 = PART.A.h;
+  const segments = 80, halfAngle = Math.asin(0.0007 / outerR), vertices = [];
+  const angles = Array.from({ length: segments + 1 }, (_, i) => (Math.PI * 2 * i) / segments);
+  for (let i = 0; i < segments; i++) {
+    const a = angles[i], b = angles[i + 1], mid = (a + b) / 2;
+    if (Math.abs(Math.atan2(Math.sin(mid), Math.cos(mid))) < halfAngle) continue;
+    prodQuad(vertices, prodWallPoint(outerR, a, z0), prodWallPoint(outerR, b, z0), prodWallPoint(outerR, b, z1), prodWallPoint(outerR, a, z1));
+    prodQuad(vertices, prodWallPoint(innerR, a, z0), prodWallPoint(innerR, a, z1), prodWallPoint(innerR, b, z1), prodWallPoint(innerR, b, z0));
+    prodQuad(vertices, prodWallPoint(innerR, a, z1), prodWallPoint(outerR, a, z1), prodWallPoint(outerR, b, z1), prodWallPoint(innerR, b, z1));
+    prodQuad(vertices, prodWallPoint(innerR, a, z0), prodWallPoint(outerR, a, z0), prodWallPoint(outerR, b, z0), prodWallPoint(innerR, b, z0), true);
+  }
+  for (const a of [-halfAngle, halfAngle]) {
+    prodQuad(vertices, prodWallPoint(innerR, a, z0), prodWallPoint(innerR, a, z1), prodWallPoint(outerR, a, z1), prodWallPoint(outerR, a, z0));
+  }
+  const flange = new THREE.BufferGeometry();
+  flange.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  flange.computeVertexNormals();
+
+  return [
+    { geo: wall, mat: PROD_MAT.A },
+    { geo: bottom, mat: PROD_MAT.A },
+    { geo: flange, mat: PROD_MAT.A },
+  ];
+}
+
+function bSpringCurve(length, lod = 1) {
+  const P = PART.B;
+  const r = (P.od - P.wire) / 2;
+  const samples = lod === 2 ? 48 : lod === 0 ? 180 : 120;
+  const pts = [];
+  for (let i = 0; i <= samples; i++) {
+    const u = i / samples;
+    const ang = u * Math.PI * 2 * P.coils;
+    pts.push(new THREE.Vector3(Math.cos(ang) * r, Math.sin(ang) * r, u * length));
+  }
+  return new THREE.CatmullRomCurve3(pts, false, "centripetal");
+}
+
+function bSpringGeometry(length, lod = 1) {
+  const P = PART.B;
+  const curve = bSpringCurve(length, lod);
+  const tubeSegments = lod === 0 ? 180 : lod === 2 ? 48 : 96;
+  const radialSegments = lod === 0 ? 10 : lod === 2 ? 3 : 8;
+  const geo = new THREE.TubeGeometry(curve, tubeSegments, P.wire / 2, radialSegments, false);
+  return [{ geo, mat: PROD_MAT.B }];
+}
+
+function cCapGeometry(lod = 1) {
+  const P = PART.C;
+  const seg = lod === 0 ? 48 : lod === 2 ? 12 : 32;
+  const bezierSamples = lod === 0 ? 12 : lod === 2 ? 3 : 8;
+  const sphereSamples = lod === 0 ? 24 : lod === 2 ? 4 : 16;
+  const bodyR = P.d / 2, domeR = 0.0091, domeBase = 0.0125;
+  const sphereCenter = P.h - domeR;
+  const profile = [new THREE.Vector2(0, 0), new THREE.Vector2(bodyR, 0), new THREE.Vector2(bodyR, domeBase - 0.0004)];
+  for (let i = 1; i <= bezierSamples; i++) {
+    const u = i / bezierSamples, v = 1 - u;
+    const r = v ** 3 * bodyR + 3 * v ** 2 * u * bodyR + 3 * v * u ** 2 * (bodyR + 0.00012) + u ** 3 * Math.sqrt(domeR ** 2 - (domeBase - sphereCenter) ** 2);
+    const z = v ** 3 * (domeBase - 0.0004) + 3 * v ** 2 * u * (domeBase - 0.00027) + 3 * v * u ** 2 * (domeBase - 0.00013) + u ** 3 * domeBase;
+    profile.push(new THREE.Vector2(r, z));
+  }
+  for (let i = 1; i <= sphereSamples; i++) {
+    const z = domeBase + (P.h - domeBase) * i / sphereSamples;
+    const r = Math.sqrt(Math.max(0, domeR ** 2 - (z - sphereCenter) ** 2));
+    profile.push(new THREE.Vector2(r, z));
+  }
+  const cap = new THREE.LatheGeometry(profile, seg);
+  cap.rotateX(Math.PI / 2);
+
+  const legGeo = new THREE.BoxGeometry(0.002, 0.001, 0.007);
+  const barbGeo = new THREE.BoxGeometry(0.001, 0.0015, 0.001);
+  const items = [{ geo: cap, mat: PROD_MAT.C }];
+  for (const sign of [-1, 1]) {
+    const leg = legGeo.clone();
+    leg.translate(0, sign * 0.00575, 0.0005);
+    const barb = barbGeo.clone();
+    barb.translate(0, sign * 0.00598, -0.0025);
+    items.push({ geo: leg, mat: PROD_MAT.C }, { geo: barb, mat: PROD_MAT.C });
+  }
+  const rib = new THREE.BoxGeometry(0.0004, 0.001, 0.004);
+  rib.translate(0.00645, 0, 0.0085);
+  items.push({ geo: rib, mat: PROD_MAT.C });
+  return items;
+}
+
 function prodGeometry(type, lod = 1) {
   const k = `${type}:${lod}`;
   if (prodGeoCache.has(k)) return prodGeoCache.get(k);
-  const P = PART[type];
+
   let parts;
-  if (type === "A") {
-    const g = new THREE.CylinderGeometry(P.d / 2, P.d / 2, P.h - P.flangeH, 24); g.rotateX(Math.PI / 2); g.translate(0, 0, (P.h - P.flangeH) / 2);
-    const f = new THREE.CylinderGeometry(P.flangeD / 2, P.flangeD / 2, P.flangeH, 24); f.rotateX(Math.PI / 2); f.translate(0, 0, P.h - P.flangeH / 2);
-    parts = [{ geo: g, mat: PROD_MAT.A }, { geo: f, mat: PROD_MAT.A }];
-  } else if (type === "B") {
-    const g = new THREE.CylinderGeometry(P.od / 2, P.od / 2, P.free, 12, 1, true); g.rotateX(Math.PI / 2); g.translate(0, 0, P.free / 2);
-    parts = [{ geo: g, mat: PROD_MAT.B }];
-  } else {
-    const g = new THREE.CylinderGeometry(P.d / 2, P.d / 2, P.h, 24); g.rotateX(Math.PI / 2); g.translate(0, 0, P.h / 2);
-    parts = [{ geo: g, mat: PROD_MAT.C }];
-  }
+  if (type === "A") parts = aHousingGeometry(lod);
+  else if (type === "B") parts = bSpringGeometry(PART.B.free, lod);
+  else parts = cCapGeometry(lod);
+
   prodGeoCache.set(k, parts);
   return parts;
 }
+
 function makePart(type, lod = 1) {
-  const g = new THREE.Group(); g.name = `part_${type}`;
-  for (const { geo, mat } of prodGeometry(type, lod)) { const o = new THREE.Mesh(geo, mat); o.castShadow = o.receiveShadow = true; g.add(o); }
+  const g = new THREE.Group();
+  g.name = `part_${type}`;
   g.userData.type = type;
+  for (const { geo, mat } of prodGeometry(type, lod)) {
+    const o = new THREE.Mesh(geo, mat);
+    o.castShadow = o.receiveShadow = true;
+    g.add(o);
+  }
+  if (type === "B") {
+    g.userData.springLength = PART.B.free;
+  }
   return g;
 }
-function setSpringLength(obj, len) { obj.scale.z = len / PART.B.free; }
+
+function setSpringLength(obj, len) {
+  if (!obj || obj.userData.type !== "B") return;
+  const clamped = Math.max(0.0001, len);
+  obj.userData.springLength = clamped;
+  for (let i = obj.children.length - 1; i >= 0; i--) obj.remove(obj.children[i]);
+  const P = PART.B;
+  const curve = bSpringCurve(clamped, 1);
+  const geo = new THREE.TubeGeometry(curve, 96, P.wire / 2, 8, false);
+  const mesh = new THREE.Mesh(geo, PROD_MAT.B);
+  mesh.castShadow = mesh.receiveShadow = true;
+  obj.add(mesh);
+}
 // ---------------------------------------------------------------- frame: machine base, guard, delta portal, stack light, HMI, cabinet
 // M0 STUB (owner: frame task). Contract, fixed:
 //   FRAME.root (module "frame"); FRAME.guards (group toggled by the Guards switch: setGuards(on));
@@ -2990,79 +3167,654 @@ function updateBowls(t) {
   }
 }
 // ---------------------------------------------------------------- dial: indexer, dial plate + nests, centre column, star plate, S4-S6, S8
-// M0 STUB (owner: dial task). Contract, fixed: DIALM.root (module "dial"); updateDial(t) drives
+// Contract, fixed: DIALM.root (module "dial"); updateDial(t) drives
 //   - the dial plate + 8 nests from dialAngle(t) (group DIALM.plate rotates about the dial centre),
-//   - the S4 press ram from pressState(t).z (tool face z), the S5 flash from visionState(t).flash,
+//   - the S4 press ram from pressState(t).z (tool face z), the S5 ring flash from visionState(t).flash,
 //   - the S6 reject unit from rejectState(t) / rejectTCP(), the S8 sensor LED.
-// Geometry must match TOOL / PZ / TOOL.rej in the logic (the clearance capsules are built from the same numbers).
+// Geometry follows TOOL / PZ / TOOL.rej in the logic (the clearance capsules are built from the same numbers).
 const DIALM = (() => {
-  const root = moduleRoot("dial"), I = LAYOUT.indexer;
-  rbox(I.w, I.d, I.z1 - I.z0, 0.006, M.ral7035, DIAL.cx, DIAL.cy, (I.z0 + I.z1) / 2, root);
-  const mot = vcyl(I.motor.r, I.motor.len, M.ral7035, DIAL.cx - I.w / 2 - I.motor.len / 2, DIAL.cy, I.motor.z, 32, root); mot.rotation.set(0, 0, Math.PI / 2);
+  const root = moduleRoot("dial");
+  const I = LAYOUT.indexer, S4 = st(4), S5 = st(5), S6 = st(6), S8 = st(8);
+  const TAU = Math.PI * 2;
+
+  // ---------------------------------------------------------------- merged geometry helpers
+  function dialPrep(g) {
+    const c = g.index ? g.toNonIndexed() : g;
+    for (const k of Object.keys(c.attributes)) if (k !== "position" && k !== "normal" && k !== "uv") c.deleteAttribute(k);
+    if (!c.attributes.normal) c.computeVertexNormals();
+    if (!c.attributes.uv) c.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(c.attributes.position.count * 2), 2));
+    return c;
+  }
+  function dialMerge(list) {
+    const prepped = list.map(dialPrep);
+    return prepped.length === 1 ? prepped[0] : BufferGeometryUtils.mergeGeometries(prepped, false);
+  }
+  function dialStore(parent) { return { parent, maps: new Map() }; }
+  function dialAdd(st, mat, g, x = 0, y = 0, z = 0, rz = 0, ry = 0, rx = 0) {
+    if (rx || ry || rz) {
+      const m = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(rx, ry, rz, "XYZ"));
+      m.setPosition(x, y, z); g.applyMatrix4(m);
+    } else g.translate(x, y, z);
+    let list = st.maps.get(mat);
+    if (!list) st.maps.set(mat, (list = []));
+    list.push(g);
+  }
+  function dialFlush(st) {
+    for (const [mat, list] of st.maps) mesh(dialMerge(list), mat, st.parent);
+  }
+  // Lathe geometry about z, profile points bottom -> top (or a closed loop, counter-clockwise in r/z).
+  function dialLatheGeo(prof, seg = 48) {
+    const g = new THREE.LatheGeometry(prof.map(([r, z]) => new THREE.Vector2(r, z)), seg);
+    g.rotateX(Math.PI / 2); return g;
+  }
+  function dialCylZ(r, h, seg = 32) { const g = new THREE.CylinderGeometry(r, r, h, seg); g.rotateX(Math.PI / 2); return g; }
+  function dialCylX(r, h, seg = 32) { const g = new THREE.CylinderGeometry(r, r, h, seg); g.rotateZ(Math.PI / 2); return g; }
+  function dialCylY(r, h, seg = 32) { return new THREE.CylinderGeometry(r, r, h, seg); }
+  // Rounded rectangular solid. RoundedBoxGeometry is (w, y, z) before our cell-frame convention w/x, d/y, h/z.
+  function dialBoxGeo(w, d, h, r = 0.003) {
+    const rr = Math.max(1e-5, Math.min(r, Math.min(w, d, h) / 2 - 1e-5));
+    return new RoundedBoxGeometry(w, d, h, 3, rr);
+  }
+  function dialRingGeo(ro, ri, z0, z1, seg = 48) {
+    return dialLatheGeo([[ri, z0], [ro, z0], [ro, z1], [ri, z1], [ri, z0]], seg);
+  }
+  function dialDiscGeo(r, z0, z1, seg = 48) {
+    return dialLatheGeo([[0, z0], [r, z0], [r, z1], [0, z1]], seg);
+  }
+  // Rounded rectangle as a THREE.Shape, centred on the origin.
+  function dialRoundRect(w, d, r) {
+    const s = new THREE.Shape(), x = w / 2, y = d / 2, rr = Math.min(r, x - 1e-4, y - 1e-4);
+    s.moveTo(-x + rr, -y);
+    s.lineTo(x - rr, -y); s.quadraticCurveTo(x, -y, x, -y + rr);
+    s.lineTo(x, y - rr); s.quadraticCurveTo(x, y, x - rr, y);
+    s.lineTo(-x + rr, y); s.quadraticCurveTo(-x, y, -x, y - rr);
+    s.lineTo(-x, -y + rr); s.quadraticCurveTo(-x, -y, -x + rr, -y);
+    return s;
+  }
+  // Extrude a Shape (holes kept) from z0 to z1; b = bevel size, compensated so the span stays exact.
+  function dialExtrudeGeo(shape, z0, z1, b = 0, curve = 24) {
+    const bb = Math.max(0, Math.min(b, (z1 - z0) / 2 - 1e-5));
+    const g = new THREE.ExtrudeGeometry(shape, { depth: (z1 - z0) - 2 * bb, bevelEnabled: bb > 0, bevelThickness: bb, bevelSize: bb, bevelOffset: 0, bevelSegments: 2, curveSegments: curve });
+    g.translate(0, 0, z0 + bb); return g;
+  }
+  // A circle with a rectangular key notch on +x (radial outward in the nest frame). Path traced ccw.
+  function dialPocketPath(r, notchW, notchD) {
+    const p = new THREE.Path(), th = Math.asin(Math.min(0.9, notchW / 2 / r));
+    const n = 44;
+    p.moveTo(r * Math.cos(th), r * Math.sin(th));
+    for (let i = 1; i <= n; i++) {
+      const a = th + (TAU - 2 * th) * (i / n);
+      p.lineTo(r * Math.cos(a), r * Math.sin(a));
+    }
+    p.lineTo(notchD, -notchW / 2);
+    p.lineTo(notchD, notchW / 2);
+    p.closePath(); return p;
+  }
+  // 6-segment hex head / nut, flat to flat size across (m).
+  function dialHexGeo(across, h) { const g = new THREE.CylinderGeometry(across / Math.sqrt(3), across / Math.sqrt(3), h, 6); g.rotateX(Math.PI / 2); return g; }
+  // M5 socket head cap screw, z0 = seating face.
+  function dialScrewGeo(z0, d = 0.0085, h = 0.0048) {
+    const r = d / 2;
+    return dialLatheGeo([[0, z0], [r * 0.86, z0], [r * 0.96, z0 + h * 0.18], [r, z0 + h * 0.55], [r * 0.92, z0 + h], [0, z0 + h]], 20);
+  }
+
+  const stat = dialStore(root), plateStore = dialStore(null);
+
+  // ================================================================ indexer (Weiss TC220T class)
+  // base plate + cast housing 260 x 260 x 133, output flange 20 mm below the dial
+  dialAdd(stat, M.ral7016, dialBoxGeo(0.300, 0.300, 0.012, 0.004), 0, 0, 0.006);
+  dialAdd(stat, M.ral7035, dialBoxGeo(0.260, 0.260, 0.133, 0.010), 0, 0, 0.0785);
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+    dialAdd(stat, M.ral7035, dialBoxGeo(0.014, 0.044, 0.105, 0.003), sx * 0.136, sy * 0.062, 0.078);
+    dialAdd(stat, M.ral7035, dialBoxGeo(0.044, 0.014, 0.105, 0.003), sx * 0.062, sy * 0.136, 0.078);
+  }
+  // front inspection cover, gasket and nameplate
+  dialAdd(stat, M.ral7035, dialBoxGeo(0.120, 0.006, 0.098, 0.003), 0.012, -0.133, 0.078);
+  dialAdd(stat, M.blackPlastic, dialBoxGeo(0.128, 0.002, 0.106, 0.002), 0.012, -0.1295, 0.078);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) dialAdd(stat, M.steel, dialScrewGeo(0, 0.0060, 0.0035), 0.012 + sx * 0.048, -0.1365, 0.078 + sz * 0.041, 0, 0, Math.PI / 2);
+  // base hold-down bolts
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+    dialAdd(stat, M.steel, dialHexGeo(0.016, 0.006), sx * 0.120, sy * 0.120, 0.015);
+    dialAdd(stat, M.steel, dialCylZ(0.0085, 0.0025, 16), sx * 0.120, sy * 0.120, 0.0185);
+  }
+  // rotating output flange under the dial
+  const flangeProf = [[0.045, 0.144], [0.106, 0.144], [0.110, 0.147], [0.110, 0.160], [0.107, 0.165], [0.075, 0.165], [0.075, 0.144], [0.045, 0.144]];
+  dialAdd(plateStore, M.aluBlasted, dialLatheGeo(flangeProf, 64));
+  // black gasket ring around the flange (stationary, on the indexer top)
+  dialAdd(stat, M.blackPlastic, dialRingGeo(0.124, 0.111, 0.145, 0.148, 64));
+  // side geared brake motor, axis -x, z = 0.080
+  const MZ = I.motor.z;
+  dialAdd(stat, M.aluBlasted, dialCylX(0.080, 0.020, 40), -0.140, 0, MZ);
+  dialAdd(stat, M.aluBlasted, dialCylX(0.075, 0.055, 40), -0.1775, 0, MZ);
+  dialAdd(stat, M.ral7035, dialCylX(I.motor.r, 0.150, 40), -0.280, 0, MZ);
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * TAU, g = dialBoxGeo(0.142, 0.009, 0.012, 0.002); g.translate(0, 0.062, 0);
+    dialAdd(stat, M.ral7035, g, -0.280, 0, MZ, 0, 0, a);
+  }
+  // fan cover: light-grey shroud and domed end cap with dark ventilator slots
+  dialAdd(stat, M.ral7035, dialCylX(0.070, 0.045, 40), -0.3775, 0, MZ);
+  dialAdd(stat, M.ral7035, dialLatheGeo([[0, 0], [0.070, 0], [0.064, 0.004], [0.045, 0.010], [0.020, 0.0155], [0, 0.016]], 40), -0.400, 0, MZ, 0, -Math.PI / 2, 0);
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * TAU, g = dialBoxGeo(0.026, 0.006, 0.0015, 0.0005); g.translate(0, 0.0705, 0);
+    dialAdd(stat, M.blackPlastic, g, -0.383, 0, MZ, 0, 0, a);
+  }
+  // terminal box on the side of the motor (the dial overhangs the top), cable gland and cable
+  dialAdd(stat, M.ral7035, dialBoxGeo(0.090, 0.050, 0.060, 0.006), -0.255, 0.070, 0.080);
+  dialAdd(stat, M.blackPlastic, dialBoxGeo(0.090, 0.002, 0.060, 0.001), -0.255, 0.0445, 0.080);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) dialAdd(stat, M.steel, dialScrewGeo(0, 0.0055, 0.003), -0.255 + sx * 0.036, 0.095, 0.080 + sz * 0.020, 0, 0, -Math.PI / 2);
+  dialAdd(stat, M.blackPlastic, dialCylY(0.010, 0.022, 16), -0.282, 0.102, 0.060);
+  // (motor cable is built with the other static cable runs below)
+  // small motor nameplate
+  dialAdd(stat, M.steel, dialBoxGeo(0.070, 0.003, 0.040, 0.001), -0.255, -0.061, MZ);
+  // brake release lever on the fan cover
+  dialAdd(stat, M.steel, dialCylX(0.004, 0.048, 12), -0.428, 0.028, 0.110);
+  dialAdd(stat, M.blackPlastic, dialCylX(0.007, 0.012, 12), -0.458, 0.028, 0.110);
+  // indexer nameplate (faces the operator, -y)
+  const nameplate = labelPlane("WEISS TC220T", 0.098, 0.032, { bg: "#d5d7d3", fg: "#20242a", px: 160, font: "600 72px 'IBM Plex Sans', sans-serif" });
+  nameplate.position.set(0.012, -0.1372, 0.080); nameplate.rotation.x = Math.PI / 2; root.add(nameplate);
+
+  // ================================================================ dial plate, 8 nests, rotating flange
   const plate = new THREE.Group(); plate.name = "dial_plate"; plate.position.set(DIAL.cx, DIAL.cy, 0); root.add(plate);
-  const disc = lathe([[0.075, DIAL.top - DIAL.t], [DIAL.r, DIAL.top - DIAL.t], [DIAL.r, DIAL.top], [0.075, DIAL.top]], M.alAnodGrey, plate, 96);
-  const nests = [];
-  for (let n = 0; n < DIAL.n; n++) {
-    const a = STATIONS[n].a, g = new THREE.Group(); g.name = `dial_nest_${n}`;
-    g.position.set(DIAL.nestR * Math.cos(a), DIAL.nestR * Math.sin(a), 0); g.rotation.z = a; plate.add(g);
-    rbox(0.060, 0.080, DIAL.nestTop - DIAL.top, 0.003, M.nestPOM, 0, 0, (DIAL.nestTop + DIAL.top) / 2, g);
-    nests.push(g);
+  plateStore.parent = plate;
+  // plate: closed ring, centre bore 150, top 0.185
+  const plateProf = [[0.075, DIAL.top - DIAL.t], [DIAL.r - 0.0015, DIAL.top - DIAL.t], [DIAL.r, DIAL.top - DIAL.t + 0.0015], [DIAL.r, DIAL.top - 0.0015], [DIAL.r - 0.0015, DIAL.top], [0.075, DIAL.top], [0.0755, DIAL.top - 0.0015], [0.0755, DIAL.top - DIAL.t + 0.0015]];
+  dialAdd(plateStore, M.alAnodGrey, dialLatheGeo(plateProf, 128));
+  // seal in the bore, running on the stationary centre flange
+  dialAdd(plateStore, M.blackPlastic, dialRingGeo(0.0754, 0.0732, DIAL.top - DIAL.t + 0.001, DIAL.top - 0.001, 64));
+  // 8 stainless plate screws between the nests
+  for (let n = 0; n < 8; n++) {
+    const a = STATIONS[n].a + DIAL.step / 2, x = 0.323 * Math.cos(a), y = 0.323 * Math.sin(a);
+    dialAdd(plateStore, M.steel, dialScrewGeo(DIAL.top, 0.010, 0.005), x, y, 0);
+    dialAdd(plateStore, M.blackPlastic, dialCylZ(0.0022, 0.0012, 6), x, y, DIAL.top + 0.0046);
   }
-  // centre column, star hub and arms (TOOL in the logic)
-  vcyl(TOOL.column.r, TOOL.column.z1 - TOOL.column.z0, M.steel, 0, 0, (TOOL.column.z0 + TOOL.column.z1) / 2, 32, root);
-  vcyl(TOOL.star.hubR, TOOL.star.z1 - TOOL.star.z0, M.alAnodGrey, 0, 0, (TOOL.star.z0 + TOOL.star.z1) / 2, 48, root);
+  // nests: POM block 60 radial x 80 tangential x 35 tall, pocket 20.4 x 8, key notch, dowels + screws
+  const nestR = DIAL.nestR, blockW = 0.060, blockD = 0.080, top = DIAL.nestTop, bot = DIAL.top, pocketR = 0.0102;
+  for (let n = 0; n < 8; n++) {
+    const a = STATIONS[n].a, cx = nestR * Math.cos(a), cy = nestR * Math.sin(a);
+    const xf = new THREE.Matrix4().makeRotationZ(a); xf.setPosition(cx, cy, 0);
+    const addNest = (mat, g, x = 0, y = 0, z = 0) => { g.translate(x, y, z); g.applyMatrix4(xf); dialAdd(plateStore, mat, g); };
+    // block with a Ø29 mm liner bore
+    const block = dialRoundRect(blockW, blockD, 0.006);
+    const bh = new THREE.Path(); bh.absarc(0, 0, 0.0146, 0, TAU, true); block.holes.push(bh);
+    addNest(M.nestPOM, dialExtrudeGeo(block, bot, top, 0));
+    // pocket liner: Ø20.4 bore with key notch, 8 mm deep, conical lead-in ring
+    const liner = new THREE.Shape(); liner.absarc(0, 0, 0.0146, 0, TAU, false);
+    liner.holes.push(dialPocketPath(pocketR, 0.0040, 0.0134));
+    addNest(M.nestPOM, dialExtrudeGeo(liner, 0.206, top - 0.002, 0));
+    addNest(M.nestPOM, dialLatheGeo([[pocketR, top - 0.002], [0.0119, top], [0.0146, top], [0.0146, top - 0.002], [pocketR, top - 0.002]], 64));
+    addNest(M.nestPOM, dialDiscGeo(0.0146, 0.205, 0.212, 48));
+    // dowels (steel, 1.5 mm proud) and M5 screws with black washers
+    for (const sy of [-1, 1]) {
+      addNest(M.steel, dialLatheGeo([[0, top], [0.0017, top], [0.0020, top + 0.0012], [0.0020, top + 0.0030], [0.0016, top + 0.0035], [0, top + 0.0035]], 20), -0.0225, sy * 0.022, 0);
+      addNest(M.blackPlastic, dialCylZ(0.0052, 0.0012, 16), 0.0225, sy * 0.026, top + 0.0006);
+      addNest(M.steel, dialScrewGeo(top + 0.0012, 0.0085, 0.0046), 0.0225, sy * 0.026, 0);
+      addNest(M.blackPlastic, dialCylZ(0.0021, 0.0010, 6), 0.0225, sy * 0.026, top + 0.0058);
+    }
+    // small blow-off hole in the pocket floor
+    addNest(M.blackPlastic, dialCylZ(0.0016, 0.0008, 10), 0, 0, 0.2116);
+  }
+  // ================================================================ centre column + star plate
+  // stationary centre flange on the indexer; the rotating dial runs around it
+  dialAdd(stat, M.aluBlasted, dialRingGeo(0.073, 0.0448, 0.165, 0.177, 64));
+  dialAdd(stat, M.steel, dialRingGeo(0.065, 0.0448, 0.165, 0.181, 64));
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * TAU;
+    dialAdd(stat, M.steel, dialScrewGeo(0.181, 0.0060, 0.0032), 0.058 * Math.cos(a), 0.058 * Math.sin(a), 0);
+  }
+  // column, foot and top flanges
+  dialAdd(stat, M.steel, dialCylZ(TOOL.column.r, TOOL.column.z1 - TOOL.column.z0, 40), 0, 0, (TOOL.column.z0 + TOOL.column.z1) / 2);
+  dialAdd(stat, M.steel, dialRingGeo(0.064, 0.0448, 0.500, 0.516, 64));
+  dialAdd(stat, M.steel, dialRingGeo(0.064, 0.0448, 0.516, TOOL.star.z0, 64));
+  // machined grooves and a vertical cable duct on the column
+  for (const z of [0.245, 0.355, 0.455]) dialAdd(stat, M.blackPlastic, dialRingGeo(0.0455, 0.0450, z, z + 0.004, 40));
+  dialAdd(stat, M.blackPlastic, dialBoxGeo(0.026, 0.022, 0.300, 0.004), 0.052, 0, 0.335);
+  for (const z of [0.260, 0.340, 0.420]) dialAdd(stat, M.steel, dialBoxGeo(0.032, 0.028, 0.006, 0.001), 0.052, 0, z);
+  // star hub and four arms (S4, S5, S6, S8); S1-S3 and S7 stay open
+  dialAdd(stat, M.alAnodGrey, dialLatheGeo([[0, 0.520], [0.078, 0.520], [0.080, 0.522], [0.080, 0.538], [0.078, 0.540], [0, 0.540]], 64));
+  const armShape = new THREE.Shape();
+  armShape.moveTo(0.045, -0.030);
+  armShape.lineTo(0.310, -0.030);
+  armShape.absarc(0.310, 0, 0.030, -Math.PI / 2, Math.PI / 2, false);
+  armShape.lineTo(0.045, 0.030); armShape.closePath();
+  const armGeo = dialExtrudeGeo(armShape, TOOL.star.z0, TOOL.star.z1, 0.0012);
   for (const s of TOOL.star.stations) {
-    const a = st(s).a, len = TOOL.star.armEnd - TOOL.star.hubR + 0.03, r0 = (TOOL.star.hubR + TOOL.star.armEnd) / 2;
-    const arm = rbox(len, TOOL.star.armW, TOOL.star.z1 - TOOL.star.z0, 0.003, M.alAnodGrey, r0 * Math.cos(a), r0 * Math.sin(a), (TOOL.star.z0 + TOOL.star.z1) / 2, root);
-    arm.rotation.z = a;
+    const a = st(s).a;
+    const g = armGeo.clone(); dialAdd(stat, M.alAnodGrey, g, 0, 0, 0, a);
+    // arm-root and arm-end bolts
+    for (const r of [0.112, 0.292]) for (const sy of [-1, 1]) {
+      const x = r * Math.cos(a) - sy * 0.018 * Math.sin(a), y = r * Math.sin(a) + sy * 0.018 * Math.cos(a);
+      dialAdd(stat, M.steel, dialScrewGeo(TOOL.star.z1, 0.010, 0.005), x, y, 0);
+      dialAdd(stat, M.blackPlastic, dialCylZ(0.0024, 0.0012, 6), x, y, TOOL.star.z1 + 0.005);
+    }
   }
-  // S4 servo press: body + ram (moves), anvil under the dial
-  const S4 = st(4);
-  vcyl(TOOL.press.r, TOOL.press.z1 - 0.36, M.ral7035, S4.x, S4.y, (TOOL.press.z1 + 0.36) / 2, 32, root);
-  const ram = new THREE.Group(); ram.name = "dial_press_ram"; ram.position.set(S4.x, S4.y, 0); root.add(ram);
-  vcyl(0.008, 0.10, M.chrome, 0, 0, 0.05, 16, ram); vcyl(0.010, 0.010, M.steel, 0, 0, 0.005, 16, ram);
-  vcyl(LAYOUT.anvil.r, LAYOUT.anvil.z1 - LAYOUT.anvil.z0, M.steel, S4.x, S4.y, (LAYOUT.anvil.z0 + LAYOUT.anvil.z1) / 2, 24, root);
-  // S5 camera + ring light
-  const S5 = st(5);
-  rbox(0.05, 0.05, TOOL.camera.z1 - TOOL.camera.z0, 0.004, M.t3Dark, S5.x, S5.y, (TOOL.camera.z0 + TOOL.camera.z1) / 2, root);
-  const ringMat = M.lampGreen.clone(); ringMat.emissive.set(0xffffff); ringMat.emissiveIntensity = 0;
-  const ring = mesh(new THREE.TorusGeometry(TOOL.camera.ringR - 0.008, 0.008, 12, 40), ringMat, root); ring.position.set(S5.x, S5.y, TOOL.camera.ringZ);
-  // S6 reject unit: rail + carriage + gripper (moves)
-  const S6 = st(6);
-  const rail = rbox(TOOL.rej.out + 0.08, 0.03, 0.03, 0.003, M.aluClear, S6.x + Math.cos(S6.a) * TOOL.rej.out / 2, S6.y + Math.sin(S6.a) * TOOL.rej.out / 2, TOOL.rej.railZ, root);
-  rail.rotation.z = S6.a;
-  const rej = new THREE.Group(); rej.name = "dial_reject"; root.add(rej);
-  rbox(0.03, 0.03, 0.12, 0.003, M.aluDark, 0, 0, 0.06, rej);
-  // S8 sensor bracket
-  const S8 = st(8), tx = -Math.sin(S8.a) * TOOL.s8.offset, ty = Math.cos(S8.a) * TOOL.s8.offset;
-  vcyl(0.008, TOOL.s8.z1 - TOOL.s8.z0, M.aluClear, S8.x + tx, S8.y + ty, (TOOL.s8.z0 + TOOL.s8.z1) / 2, 12, root);
-  // reject chute + bin
+  // hub bolts and a black cable-clamp strip along each arm
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * TAU + 0.3;
+    dialAdd(stat, M.steel, dialScrewGeo(TOOL.star.z1, 0.010, 0.005), 0.056 * Math.cos(a), 0.056 * Math.sin(a), 0);
+  }
+  for (const s of TOOL.star.stations) {
+    const a = st(s).a;
+    for (const r of [0.135, 0.225, 0.305]) {
+      const cx = r * Math.cos(a) - 0.020 * Math.sin(a), cy = r * Math.sin(a) + 0.020 * Math.cos(a);
+      dialAdd(stat, M.blackPlastic, dialBoxGeo(0.016, 0.024, 0.006, 0.002), cx, cy, TOOL.star.z1 + 0.003, a);
+    }
+  }
+
+  // ================================================================ S4 servo press (electromechanical cylinder)
+  const pressX = S4.x, pressY = S4.y;
+  // mounting plate under the S4 arm, body 70 x 70 x 194 (envelope r 40, z 0.30..0.78)
+  dialAdd(stat, M.aluBlasted, dialBoxGeo(0.112, 0.112, 0.014, 0.005), pressX, pressY, 0.513);
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) dialAdd(stat, M.steel, dialScrewGeo(0.506, 0.0090, 0.0040), pressX + sx * 0.042, pressY + sy * 0.042, 0);
+  dialAdd(stat, M.aluBlasted, dialBoxGeo(0.070, 0.070, 0.194, 0.012), pressX, pressY, 0.409);
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+    const g = dialBoxGeo(0.0022, 0.010, 0.178, 0.001);
+    dialAdd(stat, M.blackPlastic, g, pressX + sx * 0.0351, pressY + sy * 0.0180, 0.409);
+    const h = dialBoxGeo(0.010, 0.0022, 0.178, 0.001);
+    dialAdd(stat, M.blackPlastic, h, pressX + sx * 0.018, pressY + sy * 0.0340, 0.409);
+  }
+  // load cell disc and wiper at the bottom of the cylinder
+  dialAdd(stat, M.steel, dialRingGeo(0.028, 0.0090, 0.300, 0.312, 40));
+  dialAdd(stat, M.blackPlastic, dialRingGeo(0.0200, 0.0090, 0.300, 0.305, 32));
+  for (let i = 0; i < 4; i++) {
+    const a = i * Math.PI / 2 + Math.PI / 4;
+    dialAdd(stat, M.steel, dialScrewGeo(0.312, 0.0055, 0.0028), pressX + 0.020 * Math.cos(a), pressY + 0.020 * Math.sin(a), 0);
+  }
+  // servo motor stack above the arm
+  dialAdd(stat, M.aluBlasted, dialBoxGeo(0.092, 0.092, 0.012, 0.004), pressX, pressY, 0.546);
+  dialAdd(stat, M.aluBlasted, dialCylZ(0.048, 0.050, 40), pressX, pressY, 0.577);
+  for (let i = 0; i < 4; i++) {
+    const a = i * Math.PI / 2 + Math.PI / 4;
+    dialAdd(stat, M.steel, dialScrewGeo(0.602, 0.0060, 0.0030), pressX + 0.036 * Math.cos(a), pressY + 0.036 * Math.sin(a), 0);
+  }
+  dialAdd(stat, M.blackPlastic, dialCylZ(0.038, 0.140, 40), pressX, pressY, 0.672);
+  dialAdd(stat, M.aluBlasted, dialCylZ(0.042, 0.010, 40), pressX, pressY, 0.747);
+  dialAdd(stat, M.blackPlastic, dialLatheGeo([[0, 0.752], [0.035, 0.752], [0.035, 0.762], [0.030, 0.774], [0, 0.774]], 32), pressX, pressY, 0);
+  dialAdd(stat, M.blackPlastic, dialBoxGeo(0.055, 0.035, 0.040, 0.005), pressX, pressY + 0.049, 0.660);
+  dialAdd(stat, M.blackPlastic, dialCylY(0.008, 0.016, 12), pressX, pressY + 0.069, 0.660);
+  dialAdd(stat, M.steel, dialBoxGeo(0.050, 0.003, 0.028, 0.001), pressX, pressY - 0.0385, 0.670);
+  // press label and a small pressure gauge/port on the front of the body
+  const pressLabel = labelPlane("S4 · PRESS 8 kN", 0.044, 0.014, { bg: "#c9cdc8", fg: "#22262a", px: 160, font: "600 60px 'IBM Plex Sans', sans-serif" });
+  pressLabel.position.set(pressX, pressY - 0.036, 0.455); pressLabel.rotation.x = Math.PI / 2; root.add(pressLabel);
+  dialAdd(stat, M.steel, dialCylY(0.012, 0.016, 16), pressX + 0.020, pressY - 0.040, 0.340);
+  dialAdd(stat, M.blackPlastic, dialCylY(0.007, 0.020, 12), pressX + 0.020, pressY - 0.048, 0.340);
+  // moving ram: tool face at pressState(t).z, chrome rod Ø16, tool cup Ø14
+  const ram = new THREE.Group(); ram.name = "dial_press_ram"; ram.position.set(pressX, pressY, PZ.up); root.add(ram);
+  mesh(dialMerge([
+    dialCylZ(0.008, 0.250, 24).translate(0, 0, 0.137),
+    dialLatheGeo([[0.0062, 0], [0.0070, 0], [0.0070, 0.010], [0.0066, 0.012], [0.0062, 0.012], [0.0062, 0]], 32),
+    dialDiscGeo(0.0070, 0.010, 0.012, 32),
+  ]), M.chrome, ram);
+  const cupFace = mesh(dialRingGeo(0.0070, 0.0062, -0.0002, 0.0018, 32), M.blackPlastic, ram);
+  cupFace.renderOrder = 1;
+  // hardened anvil under the dial at S4
+  dialAdd(stat, M.ral7016, dialBoxGeo(0.120, 0.120, 0.020, 0.005), pressX, pressY, 0.010);
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) dialAdd(stat, M.steel, dialScrewGeo(0.020, 0.010, 0.005), pressX + sx * 0.043, pressY + sy * 0.043, 0);
+  dialAdd(stat, M.steel, dialCylZ(LAYOUT.anvil.r, 0.130, 32), pressX, pressY, 0.085);
+  dialAdd(stat, M.steel, dialHexGeo(0.080, 0.020), pressX, pressY, 0.125);
+  dialAdd(stat, M.steel, dialCylZ(LAYOUT.anvil.r + 0.002, 0.015, 32), pressX, pressY, 0.1575);
+  dialAdd(stat, M.chrome, dialCylZ(LAYOUT.anvil.r - 0.001, 0.004, 32), pressX, pressY, 0.1620);
+
+  // ================================================================ S5 vision (camera + ring light)
+  const cam = new THREE.Group(); cam.name = "dial_s5_camera"; cam.position.set(S5.x, S5.y, 0); cam.rotation.z = S5.a; root.add(cam);
+  const camStore = dialStore(cam);
+  dialAdd(camStore, M.blackPlastic, dialBoxGeo(0.060, 0.045, 0.100, 0.006), 0, 0, 0.450);
+  dialAdd(camStore, M.aluBlasted, dialBoxGeo(0.056, 0.042, 0.008, 0.003), 0, 0, 0.400);
+  dialAdd(camStore, M.aluBlasted, dialCylZ(0.015, 0.012, 32), 0, 0, 0.396);
+  dialAdd(camStore, M.blackPlastic, dialCylZ(0.012, 0.050, 32), 0, 0, 0.365);
+  dialAdd(camStore, M.aluBlasted, dialCylZ(0.014, 0.010, 32), 0, 0, 0.365);
+  dialAdd(camStore, M.lens, dialDiscGeo(0.0105, 0.334, 0.339, 32));
+  // ring light: torus outer radius = ringR, white diffuser, emissive flash
+  const ringMat = new THREE.MeshStandardMaterial({ color: 0xf5f2e8, roughness: 0.35, metalness: 0.0, emissive: 0xfff0d0, emissiveIntensity: 0 });
+  const ring = mesh(new THREE.TorusGeometry(TOOL.camera.ringR - 0.008, 0.008, 12, 48), ringMat, cam);
+  ring.name = "dial_ring"; ring.position.z = TOOL.camera.ringZ;
+  dialAdd(camStore, M.aluBlasted, dialRingGeo(TOOL.camera.ringR, TOOL.camera.ringR - 0.003, TOOL.camera.ringZ + 0.004, TOOL.camera.ringZ + 0.009, 48));
+  for (let i = 0; i < 3; i++) {
+    const a = i * TAU / 3 + 0.5;
+    dialAdd(camStore, M.aluClear, dialCylZ(0.0028, 0.090, 12), (TOOL.camera.ringR - 0.010) * Math.cos(a), (TOOL.camera.ringR - 0.010) * Math.sin(a), TOOL.camera.ringZ + 0.047);
+  }
+  // bracket from the S5 arm
+  dialAdd(camStore, M.aluClear, dialBoxGeo(0.078, 0.078, 0.008, 0.003), 0.008, 0, 0.516);
+  dialAdd(camStore, M.aluClear, dialBoxGeo(0.010, 0.072, 0.062, 0.003), 0.043, 0, 0.481);
+  dialAdd(camStore, M.aluClear, dialBoxGeo(0.044, 0.082, 0.008, 0.003), 0.020, 0, 0.504);
+  for (const sy of [-1, 1]) dialAdd(camStore, M.steel, dialScrewGeo(0.512, 0.0060, 0.0032), 0.043, sy * 0.028, 0);
+  const camLabel = labelPlane("S5 · VISION", 0.040, 0.012, { bg: "#2e3236", fg: "#d9e2e8", px: 128, font: "600 64px 'IBM Plex Sans', sans-serif" });
+  camLabel.position.set(0, -0.0235, 0.468); camLabel.rotation.x = Math.PI / 2; cam.add(camLabel);
+
+  // ================================================================ S6 reject unit, chute and bin
+  const railY = S6.y - TOOL.rej.out / 2;
+  dialAdd(stat, M.aluBlasted, dialBoxGeo(0.045, TOOL.rej.out + 0.020, 0.032, 0.006), S6.x, railY, TOOL.rej.railZ);
+  dialAdd(stat, M.steel, dialBoxGeo(0.020, TOOL.rej.out + 0.014, 0.006, 0.001), S6.x, railY, TOOL.rej.railZ + 0.019);
+  for (const sy of [-1, 1]) dialAdd(stat, M.ral7016, dialBoxGeo(0.060, 0.012, 0.050, 0.004), S6.x, railY + sy * (TOOL.rej.out / 2 + 0.004), TOOL.rej.railZ);
+  // support from the S6 arm and a small diagonal strut to the outer end
+  dialAdd(stat, M.aluClear, dialBoxGeo(0.080, 0.080, 0.008, 0.003), S6.x, -0.340, 0.516);
+  dialAdd(stat, M.aluClear, dialBoxGeo(0.020, 0.110, 0.015, 0.002), S6.x, -0.385, 0.530, 0, 0, 0.10);
+  dialAdd(stat, M.aluBlasted, dialBoxGeo(0.030, TOOL.rej.out + 0.020, 0.030, 0.004), S6.x + 0.045, railY, TOOL.rej.railZ);
+  for (const sy of [-1, 1]) dialAdd(stat, M.puBlue, dialCylY(0.004, 0.014, 10), S6.x + 0.045, railY + sy * 0.052, TOOL.rej.railZ + 0.018);
+  // moving carriage, guided lift and 2-finger gripper; local origin = rail centre line at the TCP x/y
+  const rej = new THREE.Group(); rej.name = "dial_reject"; rej.position.set(S6.x, S6.y, TOOL.rej.railZ); root.add(rej);
+  const rejStore = dialStore(rej);
+  dialAdd(rejStore, M.blackPlastic, dialBoxGeo(0.075, 0.060, 0.055, 0.006), 0, 0, 0.005);
+  dialAdd(rejStore, M.aluBlasted, dialBoxGeo(0.082, 0.066, 0.008, 0.003), 0, 0, 0.038);
+  dialAdd(rejStore, M.aluBlasted, dialCylZ(0.017, 0.095, 32), 0, 0, -0.0525);
+  dialAdd(rejStore, M.blackPlastic, dialCylZ(0.018, 0.008, 32), 0, 0, -0.104);
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) dialAdd(rejStore, M.steel, dialCylZ(0.0025, 0.096, 10), sx * 0.012, sy * 0.012, -0.0525);
+  dialAdd(rejStore, M.blackPlastic, dialBoxGeo(0.046, 0.030, 0.024, 0.004), 0.035, 0, 0.048);
+  for (const sy of [-1, 1]) dialAdd(rejStore, M.puBlue, dialCylY(0.004, 0.014, 10), 0.045, sy * 0.008, 0.060);
+  dialFlush(rejStore);
+  // guide rods and the two blue air hoses are stretched by scaling z
+  const rejRods = mesh(dialMerge([
+    dialCylZ(0.004, 1, 12).translate(-0.012, 0, 0),
+    dialCylZ(0.004, 1, 12).translate(0.012, 0, 0),
+  ]), M.chrome, rej);
+  const rejHoses = mesh(dialMerge([
+    dialCylZ(0.0034, 1, 10).translate(0.026, 0.011, 0),
+    dialCylZ(0.0034, 1, 10).translate(0.026, -0.011, 0),
+  ]), M.puBlue, rej);
+  rejHoses.name = "dial_reject_hoses";
+  // gripper body moves with the lift; its origin is the fingertip centre (TCP)
+  const rejTool = new THREE.Group(); rejTool.name = "dial_reject_tool"; rej.add(rejTool);
+  const toolStore = dialStore(rejTool);
+  dialAdd(toolStore, M.blackPlastic, dialBoxGeo(0.050, 0.038, 0.045, 0.004), 0, 0, 0.0525);
+  dialAdd(toolStore, M.aluBlasted, dialBoxGeo(0.056, 0.044, 0.006, 0.002), 0, 0, 0.077);
+  dialAdd(toolStore, M.steel, dialBoxGeo(0.018, 0.026, 0.020, 0.002), 0.030, 0, 0.060);
+  dialAdd(toolStore, M.puBlue, dialCylY(0.0035, 0.010, 10), 0.030, -0.020, 0.060);
+  for (const sy of [-1, 1]) dialAdd(toolStore, M.steel, dialScrewGeo(0.077, 0.0055, 0.0028), 0.018, sy * 0.014, 0);
+  dialFlush(toolStore);
+  // two fingers; each group origin is its contact face, fingertip centre on the TCP plane z = 0
+  const rejFingers = [-1, 1].map((sg, i) => {
+    const g = new THREE.Group(); g.name = `dial_reject_finger_${i}`; rejTool.add(g);
+    const fs = dialStore(g);
+    dialAdd(fs, M.steel, dialBoxGeo(0.006, 0.016, 0.090, 0.0015), sg * 0.003, 0, 0.030);
+    dialAdd(fs, M.steel, dialBoxGeo(0.008, 0.018, 0.020, 0.002), sg * 0.004, 0, 0.070);
+    dialAdd(fs, M.steel, dialBoxGeo(0.003, 0.014, 0.022, 0.001), sg * 0.0015, 0, 0.000);
+    dialFlush(fs);
+    return g;
+  });
+  // stainless chute from R = 0.43 down into the red reject bin
+  const chuteTilt = Math.atan2(0.209 - 0.178, 0.125);
+  const chuteGeo = (w, d, h) => { const g = dialBoxGeo(w, d, h, 0.0012); g.rotateX(chuteTilt); return g; };
+  dialAdd(stat, M.stainlessBrushed, chuteGeo(0.100, 0.140, 0.004), S6.x, -0.500, 0.1920);
+  for (const sx of [-1, 1]) dialAdd(stat, M.stainlessBrushed, chuteGeo(0.004, 0.140, 0.030), S6.x + sx * 0.048, -0.500, 0.2045);
+  dialAdd(stat, M.stainlessBrushed, chuteGeo(0.112, 0.022, 0.004), S6.x, -0.568, 0.1760);
+  // crossbar under the rail end carrying the two chute posts
+  dialAdd(stat, M.aluClear, dialBoxGeo(0.124, 0.022, 0.016, 0.003), S6.x, -0.438, 0.476);
+  for (const sx of [-1, 1]) dialAdd(stat, M.aluClear, dialCylZ(0.005, 0.258, 10), S6.x + sx * 0.048, -0.438, 0.339);
+  // red bin (RAL 3020) with a white REJECT label
   const B = BIN;
-  rbox(B.w, B.d, B.h, 0.004, M.ral3020, B.x, B.y, B.floor - 0.01 + B.h / 2 - 0.02, root);
-  return { root, plate, nests, ram, ring, ringMat, rej };
+  dialAdd(stat, M.ral3020, dialBoxGeo(B.w, B.d, B.floor, 0.004), B.x, B.y, B.floor / 2);
+  dialAdd(stat, M.ral3020, dialBoxGeo(B.w, 0.008, B.h, 0.003), B.x, B.y - B.d / 2 + 0.004, B.floor + B.h / 2);
+  dialAdd(stat, M.ral3020, dialBoxGeo(B.w, 0.008, B.h, 0.003), B.x, B.y + B.d / 2 - 0.004, B.floor + B.h / 2);
+  dialAdd(stat, M.ral3020, dialBoxGeo(0.008, B.d - 0.016, B.h, 0.003), B.x - B.w / 2 + 0.004, B.y, B.floor + B.h / 2);
+  dialAdd(stat, M.ral3020, dialBoxGeo(0.008, B.d - 0.016, B.h, 0.003), B.x + B.w / 2 - 0.004, B.y, B.floor + B.h / 2);
+  dialAdd(stat, M.ral3020, dialBoxGeo(B.w + 0.012, 0.014, 0.014, 0.003), B.x, B.y - B.d / 2 + 0.002, B.floor + B.h - 0.007);
+  dialAdd(stat, M.ral3020, dialBoxGeo(B.w + 0.012, 0.014, 0.014, 0.003), B.x, B.y + B.d / 2 - 0.002, B.floor + B.h - 0.007);
+  dialAdd(stat, M.ral3020, dialBoxGeo(0.014, B.d + 0.012, 0.014, 0.003), B.x - B.w / 2 + 0.002, B.y, B.floor + B.h - 0.007);
+  dialAdd(stat, M.ral3020, dialBoxGeo(0.014, B.d + 0.012, 0.014, 0.003), B.x + B.w / 2 - 0.002, B.y, B.floor + B.h - 0.007);
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) dialAdd(stat, M.ral3020, dialBoxGeo(0.014, 0.014, 0.130, 0.003), B.x + sx * (B.w / 2 - 0.004), B.y + sy * (B.d / 2 - 0.004), B.floor + 0.065);
+  const binLabel = labelPlane("REJECT", 0.110, 0.032, { bg: "#f1efe9", fg: "#b3141c", px: 160, font: "700 120px 'IBM Plex Sans', sans-serif" });
+  binLabel.position.set(B.x, B.y - B.d / 2 - 0.0015, 0.110); binLabel.rotation.x = Math.PI / 2; root.add(binLabel);
+
+  // ================================================================ S8 through-beam fibre pair
+  const s8Look = 0.030;
+  const s8x = S8.x, s8Out = S8.y - s8Look, s8In = S8.y + s8Look;
+  // bracket from the S8 arm down to the outer post
+  dialAdd(stat, M.aluClear, dialBoxGeo(0.048, 0.020, 0.012, 0.003), S8.x - 0.020, s8Out, 0.514);
+  dialAdd(stat, M.aluClear, dialCylZ(0.006, TOOL.s8.z1 - 0.252, 12), s8x, s8Out, (0.252 + TOOL.s8.z1) / 2);
+  for (const hy of [s8Out, s8In]) {
+    // head bodies, lenses face each other across the nest (beam at z = 0.226)
+    const inward = Math.sign(S8.y - hy);
+    dialAdd(stat, M.blackPlastic, dialBoxGeo(0.018, 0.022, 0.026, 0.003), s8x, hy, 0.235);
+    dialAdd(stat, M.chrome, dialCylY(0.0045, 0.008, 12), s8x, hy + inward * 0.013, 0.226);
+    dialAdd(stat, M.lens, dialCylY(0.0032, 0.0016, 12), s8x, hy + inward * 0.016, 0.226);
+  }
+  // crossbar over the part, joining both heads
+  dialAdd(stat, M.aluClear, dialBoxGeo(0.018, 2 * s8Look + 0.020, 0.008, 0.002), s8x, S8.y, 0.252);
+  // amplifier with the green "dial at rest" LED
+  dialAdd(stat, M.blackPlastic, dialBoxGeo(0.026, 0.016, 0.040, 0.003), s8x, s8Out - 0.014, 0.460);
+  const s8LedMat = M.lampGreen.clone(); s8LedMat.emissive.setHex(0x35ff68); s8LedMat.emissiveIntensity = 0;
+  const s8Led = mesh(dialCylY(0.0032, 0.003, 10), s8LedMat, root);
+  s8Led.name = "dial_s8_led"; s8Led.position.set(s8x, s8Out - 0.0235, 0.468);
+  // fibre cables from the heads down the post
+  dialAdd(stat, M.blackPlastic, tubeGeo([[s8x, s8Out - 0.011, 0.235], [s8x, s8Out - 0.011, 0.300], [s8x, s8Out - 0.014, 0.460]], 0.0016, 18, 6));
+  dialAdd(stat, M.blackPlastic, tubeGeo([[s8x, s8In + 0.011, 0.235], [s8x, s8In + 0.011, 0.258], [s8x, s8Out, 0.300], [s8x, s8Out - 0.014, 0.460]], 0.0016, 18, 6));
+
+  // ================================================================ optional part-present fibre heads at S1-S3
+  for (const s of [1, 2, 3]) {
+    const S = st(s), a = S.a, px = 0.400 * Math.cos(a), py = 0.400 * Math.sin(a);
+    dialAdd(stat, M.ral7016, dialCylZ(0.018, 0.012, 20), px, py, 0.006);
+    dialAdd(stat, M.aluClear, dialCylZ(0.008, 0.230, 14), px, py, 0.121);
+    const hx = 0.366 * Math.cos(a), hy = 0.366 * Math.sin(a);
+    dialAdd(stat, M.aluClear, dialBoxGeo(0.036, 0.016, 0.014, 0.003), 0.383 * Math.cos(a), 0.383 * Math.sin(a), 0.238, a);
+    dialAdd(stat, M.blackPlastic, dialBoxGeo(0.028, 0.026, 0.022, 0.003), hx, hy, 0.232, a);
+    const lx = 0.351 * Math.cos(a), ly = 0.351 * Math.sin(a);
+    dialAdd(stat, M.chrome, dialCylX(0.005, 0.008, 12), lx, ly, 0.232, a);
+    dialAdd(stat, M.lens, dialCylX(0.0032, 0.0018, 12), 0.3469 * Math.cos(a), 0.3469 * Math.sin(a), 0.232, a);
+    dialAdd(stat, M.steel, dialScrewGeo(0, 0.0055, 0.0028), hx, hy, 0.243);
+    dialAdd(stat, M.blackPlastic, tubeGeo([[hx, hy, 0.220], [px, py, 0.180], [px, py, 0.012]], 0.0014, 18, 6));
+    for (const sy of [-1, 1]) {
+      const bx = px + sy * 0.010 * Math.sin(a), by = py - sy * 0.010 * Math.cos(a);
+      dialAdd(stat, M.steel, dialScrewGeo(0.012, 0.0050, 0.0026), bx, by, 0);
+    }
+  }
+
+  // ================================================================ static cable runs and a column duct
+  const cable = (pts, r = 0.0030) => dialAdd(stat, M.blackPlastic, tubeGeo(pts, r, 32, 8));
+  // indexer motor cable down to the base (gland on the side terminal box)
+  cable([[-0.282, 0.113, 0.060], [-0.300, 0.128, 0.030], [-0.285, 0.140, 0.012], [-0.220, 0.147, 0.008], [-0.170, 0.150, 0.008]], 0.0040);
+  // load-cell cable and motor cable on the press
+  cable([[pressX + 0.028, pressY, 0.306], [pressX + 0.040, pressY + 0.020, 0.350], [pressX + 0.036, pressY + 0.035, 0.460], [pressX + 0.028, pressY + 0.030, 0.505]], 0.0024);
+  cable([[pressX, pressY + 0.075, 0.660], [pressX + 0.018, pressY + 0.072, 0.610], [pressX + 0.030, pressY + 0.055, 0.560], [pressX + 0.020, pressY + 0.030, 0.522]], 0.0036);
+  // camera cable back to the S5 arm
+  const ca = S5.a, cp = (x, y, z) => [S5.x + x * Math.cos(ca) - y * Math.sin(ca), S5.y + x * Math.sin(ca) + y * Math.cos(ca), z];
+  cable([cp(-0.026, 0.010, 0.488), cp(-0.040, 0.020, 0.510), cp(-0.030, 0.030, 0.536), cp(0.000, 0.040, 0.542)], 0.0026);
+  // star-arm cable runs from the column duct to each tool
+  for (const s of TOOL.star.stations) {
+    const a = st(s).a, c = Math.cos(a), si = Math.sin(a), tx = -si * 0.018, ty = c * 0.018;
+    const armPts = [[0.052, 0, 0.490], [0.064 * c, 0.064 * si, 0.536], [0.130 * c + tx, 0.130 * si + ty, 0.544], [0.240 * c + tx, 0.240 * si + ty, 0.544], [0.315 * c + tx, 0.315 * si + ty, 0.544]];
+    cable(armPts, 0.0030);
+  }
+  // reject unit air supply drops from the S6 arm to the moving carriage (fixed side only)
+  cable([[0.0, -0.330, 0.535], [0.030, -0.340, 0.530], [0.048, -0.350, 0.510], [0.050, -0.360, 0.500]], 0.0030);
+  // small cable ties on the column duct
+  for (const z of [0.225, 0.305, 0.385, 0.465]) dialAdd(stat, M.blackPlastic, dialBoxGeo(0.030, 0.026, 0.004, 0.001), 0.052, 0, z);
+
+  // ================================================================ merge static geometry
+  // the camera body/bracket are fixed to the root: fold camStore into stat, keep ring + label on the cam group
+  const camXf = new THREE.Matrix4().makeRotationZ(S5.a); camXf.setPosition(S5.x, S5.y, 0);
+  for (const [mat, list] of camStore.maps) for (const g of list) {
+    g.applyMatrix4(camXf);
+    let dst = stat.maps.get(mat);
+    if (!dst) stat.maps.set(mat, (dst = []));
+    dst.push(g);
+  }
+  dialFlush(stat);
+  dialFlush(plateStore);
+
+  return { root, plate, nests: STATIONS.map((s) => ({ n: s.s - 1, a: s.a })), ram, ring, ringMat, rej, rejTool, rejFingers, rejRods, rejHoses, s8LedMat };
 })();
+const dialRailZ = TOOL.rej.railZ;
 function updateDial(t) {
   DIALM.plate.rotation.z = dialAngle(t);
   const p = pressState(t); DIALM.ram.position.z = p.z;
-  const v = visionState(t); DIALM.ringMat.emissiveIntensity = 2.5 * v.flash;
-  const r = rejectState(t), tcp = rejectTCP(r); DIALM.rej.position.set(tcp[0], tcp[1], tcp[2]);
+  const v = visionState(t); DIALM.ringMat.emissiveIntensity = 3.0 * v.flash;
+  const r = rejectState(t), tcp = rejectTCP(r);
+  DIALM.rej.position.x = tcp[0]; DIALM.rej.position.y = tcp[1];
+  const zt = tcp[2] - dialRailZ;
+  DIALM.rejTool.position.z = zt;
+  const gap = lerp(0.042, PART.A.gripW, r.grip);
+  DIALM.rejFingers[0].position.x = -gap / 2; DIALM.rejFingers[1].position.x = gap / 2;
+  const rodTop = zt + 0.077, rodBot = -0.090;
+  DIALM.rejRods.position.z = (rodTop + rodBot) / 2; DIALM.rejRods.scale.z = rodTop - rodBot;
+  const hoseTop = zt + 0.078, hoseBot = -0.018;
+  DIALM.rejHoses.position.z = (hoseTop + hoseBot) / 2; DIALM.rejHoses.scale.z = hoseTop - hoseBot;
+  DIALM.s8LedMat.emissiveIntensity = dialState(t).moving ? 0 : 2.2;
 }
+
 // ---------------------------------------------------------------- outfeed: tray shuttle, trays, empty-tray magazine, full-tray table
-// M0 STUB (owner: outfeed task). Contract, fixed: OUTFEED.root (module "outfeed"); updateOutfeed(t) places the trays
-// from trayPose(m, t) (centre of the tray top face) and the shuttle carriage from the tray on it.
-// The assemblies in the trays are drawn by the loop (tracked parts) at trayPose(m, t) + traySlot(n).
+// One tray geometry is reused for every tray object to keep the draw-call budget low.
 const OUTFEED = (() => {
   const root = moduleRoot("outfeed"), Ls = LAYOUT.tray.shuttle;
-  rbox(Ls.x1 - Ls.x0, 0.12, 0.03, 0.003, M.aluClear, (Ls.x0 + Ls.x1) / 2, Ls.y, Ls.z, root);
-  const trays = [0, 1, 2].map((m) => {
-    const g = new THREE.Group(); g.name = `out_tray_${m}`; root.add(g);
-    rbox(TRAY.w, TRAY.d, TRAY.t, 0.004, M.kltBlue, 0, 0, -TRAY.t / 2, g);
-    g.visible = false; return g;
+
+  const trayGeo = (() => {
+    const list = [];
+    const floorPlate = new THREE.BoxGeometry(TRAY.w, TRAY.d, TRAY.t - TRAY.pocket);
+    floorPlate.translate(0, 0, -TRAY.t + (TRAY.t - TRAY.pocket) / 2);
+    list.push(floorPlate);
+
+    const topShape = new THREE.Shape();
+    topShape.moveTo(-TRAY.w / 2, -TRAY.d / 2);
+    topShape.lineTo(TRAY.w / 2, -TRAY.d / 2);
+    topShape.lineTo(TRAY.w / 2, TRAY.d / 2);
+    topShape.lineTo(-TRAY.w / 2, TRAY.d / 2);
+    topShape.lineTo(-TRAY.w / 2, -TRAY.d / 2);
+    for (let n = 0; n < 24; n++) {
+      const [dx, dy] = traySlot(n);
+      const hole = new THREE.Path();
+      hole.absarc(dx, dy, 0.0105, 0, Math.PI * 2, true);
+      topShape.holes.push(hole);
+      const chamfer = new THREE.LatheGeometry([
+        new THREE.Vector2(0.0105, -0.0005),
+        new THREE.Vector2(0.011, 0),
+      ], 18);
+      chamfer.rotateX(Math.PI / 2);
+      chamfer.translate(dx, dy, 0);
+      list.push(chamfer);
+    }
+    const pocketLayer = new THREE.ExtrudeGeometry(topShape, { depth: TRAY.pocket, bevelEnabled: false });
+    pocketLayer.translate(0, 0, -TRAY.pocket);
+    list.push(pocketLayer);
+
+    const footGeo = new THREE.BoxGeometry(0.018, 0.018, 0.005);
+    const feet = [
+      [-TRAY.w / 2 + 0.018, -TRAY.d / 2 + 0.018, -TRAY.t * 0.8],
+      [TRAY.w / 2 - 0.018, -TRAY.d / 2 + 0.018, -TRAY.t * 0.8],
+      [-TRAY.w / 2 + 0.018, TRAY.d / 2 - 0.018, -TRAY.t * 0.8],
+      [TRAY.w / 2 - 0.018, TRAY.d / 2 - 0.018, -TRAY.t * 0.8],
+    ];
+    for (const [x, y, z] of feet) {
+      const f = footGeo.clone();
+      f.translate(x, y, z);
+      list.push(f);
+    }
+
+    const label = new THREE.PlaneGeometry(0.065, 0.022);
+    label.translate(0, 0, -0.003);
+    list.push(label);
+
+    const nonIndexed = list.map((geo) => geo.index ? geo.toNonIndexed() : geo);
+    return BufferGeometryUtils.mergeGeometries(nonIndexed, false);
+  })();
+
+  const trays = Array.from({ length: 6 }, (_, m) => {
+    const g = new THREE.Mesh(trayGeo, M.kltBlue.clone());
+    g.name = `out_tray_${m}`;
+    g.castShadow = g.receiveShadow = true;
+    g.visible = false;
+    root.add(g);
+    return g;
   });
-  return { root, trays };
+
+  const shuttle = new THREE.Group();
+  shuttle.name = "out_shuttle";
+  root.add(shuttle);
+
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(Ls.x1 - Ls.x0, 0.042, 0.032), M.aluClear);
+  rail.position.set((Ls.x0 + Ls.x1) / 2, Ls.y, Ls.z);
+  shuttle.add(rail);
+
+  const belt = new THREE.Mesh(new THREE.BoxGeometry(Ls.x1 - Ls.x0 - 0.05, 0.016, 0.014), M.aluDark);
+  belt.position.set((Ls.x0 + Ls.x1) / 2, Ls.y, Ls.z + 0.012);
+  shuttle.add(belt);
+
+  const motor = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.070, 20), M.motorBlack);
+  motor.rotation.z = Math.PI / 2;
+  motor.position.set(Ls.x1 + 0.055, Ls.y, Ls.z - 0.045);
+  shuttle.add(motor);
+
+  const gearbox = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.05, 0.05), M.gearboxSilver);
+  gearbox.position.set(Ls.x1 + 0.11, Ls.y, Ls.z - 0.050);
+  shuttle.add(gearbox);
+
+  const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.18, 12, 1, true), M.aluDark);
+  chain.rotation.z = Math.PI / 2;
+  chain.position.set((Ls.x0 + Ls.x1) / 2, Ls.y + 0.028, Ls.z - 0.012);
+  shuttle.add(chain);
+
+  const carriage = new THREE.Group();
+  carriage.name = "out_carriage";
+  shuttle.add(carriage);
+  const carriagePlate = rbox(0.135, 0.120, 0.018, 0.003, M.alAnodGrey, 0, 0, -0.030, carriage);
+  carriagePlate.position.z = -0.010;
+  for (const [dx, dy] of [[-0.040, 0.036], [0.040, 0.036], [-0.040, -0.036], [0.040, -0.036]]) {
+    const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.012, 12), M.steel);
+    pin.rotation.x = Math.PI / 2;
+    pin.position.set(dx, dy, -0.028);
+    carriage.add(pin);
+  }
+
+  const magazine = new THREE.Group();
+  magazine.name = "out_magazine";
+  root.add(magazine);
+  const magX = LAYOUT.tray.magazine.x, magY = LAYOUT.tray.magazine.y;
+  for (let i = 0; i < 6; i++) {
+    const tray = new THREE.Mesh(trayGeo, M.kltBlue.clone());
+    tray.name = `out_magazine_tray_${i}`;
+    tray.castShadow = tray.receiveShadow = true;
+    tray.visible = i < 6;
+    tray.position.set(magX, magY, 0.025 + i * 0.020);
+    magazine.add(tray);
+  }
+
+  const fullTable = new THREE.Group();
+  fullTable.name = "out_fullTable";
+  root.add(fullTable);
+  const tableBed = rbox(0.32, 0.18, 0.035, 0.006, M.ral7035, LAYOUT.tray.fullTable.x, LAYOUT.tray.fullTable.y, TRAY.top - 0.03, fullTable);
+  tableBed.position.z = TRAY.top - 0.03;
+  for (let i = 0; i < 5; i++) {
+    const roller = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.17, 16), M.steel);
+    roller.rotation.z = Math.PI / 2;
+    roller.position.set(LAYOUT.tray.fullTable.x - 0.10 + i * 0.05, LAYOUT.tray.fullTable.y, TRAY.top - 0.02);
+    fullTable.add(roller);
+  }
+  const pusher = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.021, 0.13, 18), M.aluClear);
+  pusher.rotation.z = Math.PI / 2;
+  pusher.position.set(LAYOUT.tray.fullTable.x + 0.06, LAYOUT.tray.fullTable.y, TRAY.top - 0.02);
+  fullTable.add(pusher);
+
+  return { root, trays, shuttle, carriage, pusher, magazine, fullTable };
 })();
+
 function updateOutfeed(t) {
-  OUTFEED.trays.forEach((g, m) => { const p = trayPose(m, t); g.visible = !!p; if (p) g.position.set(p[0], p[1], p[2]); });
+  const trayPos = (m) => trayPose(m, t);
+  const fillPos = [TRAY.cx, TRAY.cy, TRAY.top];
+
+  OUTFEED.trays.forEach((g, m) => {
+    const p = trayPos(m);
+    g.visible = !!p && !(m > 0 && p[2] === fillPos[2] && Math.abs(p[0] - fillPos[0]) < 1e-6 && Math.abs(p[1] - fillPos[1]) < 1e-6);
+    if (p) g.position.set(p[0], p[1], p[2] - TRAY.t / 2);
+  });
+
+  const activeSwap = trayLog.swaps.find((sw) => t >= sw.t0 && t <= sw.t3);
+  const target = activeSwap ? trayPos(activeSwap.m) : fillPos;
+  OUTFEED.carriage.visible = !!target;
+  if (target) {
+    OUTFEED.carriage.position.set(target[0], target[1], target[2] - TRAY.t / 2);
+  }
+
+  const magazineTrays = OUTFEED.magazine.children.filter((c) => c.isMesh && c.name.startsWith("out_magazine_tray_"));
+  const completed = trayLog.swaps.filter((s) => t >= s.t3).length;
+  const stackCount = Math.max(0, 6 - completed);
+  magazineTrays.forEach((tray, i) => {
+    tray.visible = i < stackCount;
+    if (tray.visible) {
+      tray.position.set(LAYOUT.tray.magazine.x, LAYOUT.tray.magazine.y, 0.025 + i * 0.020 + (completed ? 0 : 0));
+    }
+  });
+
+  const sw = trayLog.swaps.find((s) => t >= s.t1 && t <= s.t2);
+  const pusherPhase = sw ? clamp((t - sw.t1) / Math.max(1e-6, sw.t2 - sw.t1), 0, 1) : 0;
+  OUTFEED.pusher.visible = !!sw;
+  OUTFEED.pusher.position.x = LAYOUT.tray.fullTable.x + 0.085 + pusherPhase * 0.09;
 }
 // ---------------------------------------------------------------- delta robot: 1130-class, hung under the portal plate (metres, z up)
 const D = DELTA;
