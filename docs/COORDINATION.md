@@ -14,8 +14,8 @@ While Claude was usage-limited (about 23:30–07:25), Codex coordinated: it merg
 | product + outfeed (24, 36) | Copilot (herdr w7:p4) | feat/product | merged into main (fef62a0, cap and tray verified in close-up) |
 | frame (30) | OpenCode (herdr w7:pB, renamed `frame`) | feat/frame | in progress |
 | robots (40, 41) | Copilot (herdr w7:p4, renamed `robots`) | feat/robots | in progress |
-| app (page, 50, 60, 70) | OpenCode (herdr w7:p3, renamed `app`), finishing the paused workflow's WIP | feat/app | in progress |
-| film tools (M3) | Claude (herdr w7:p1, mini-factory-cell-setup) | feat/film | merged into main (ce459fd); final render after frame/robots/app; lead adds the fov arg to pc.setCamera |
+| app (page, 50, 60, 70) | OpenCode (herdr w7:p3, renamed `app`), finishing the paused workflow's WIP | feat/app | merged into main (bf3446b) |
+| film tools (M3) | Claude (herdr w7:p1, mini-factory-cell-setup) | feat/film | merged into main (ce459fd); final render after frame/robots/app; pc.setCamera fov added |
 | Blender pipeline (M4) | Codex first pass; now Claude (herdr w7:p1) | feat/blender | in progress: cameras from film/plan.json, materials and lights, previews (no full render before v1.0) |
 
 ## Next milestones
