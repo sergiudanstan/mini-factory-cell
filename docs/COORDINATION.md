@@ -15,7 +15,7 @@ While Claude was usage-limited (about 23:30–07:25), Codex coordinated: it merg
 | frame (30) | Claude workflow agent | feat/frame | in progress |
 | robots (40, 41) | Claude workflow agent | feat/robots | in progress |
 | app (page, 50, 60, 70) | Claude workflow agent | feat/app | in progress |
-| Blender pipeline (M4) | Codex (herdr w7:p2) | feat/blender | started |
+| Blender pipeline (M4) | Codex first pass, now the lead (Claude) | feat/blender | first pass merged (588e1d9); Codex usage-limited until 12:25 |
 
 ## Next milestones
 - **M2:** merge every branch, then an integrated visual and performance review with fixes.
