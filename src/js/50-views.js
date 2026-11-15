@@ -50,12 +50,16 @@ const VIEW_DEFS = {
 };
 const views = Object.fromEntries(Object.entries(VIEW_DEFS).map(([k, v]) => [k, { label: v.label, pos: cv(...v.pos), target: cv(...v.target) }]));
 window.pcViews = views;
+const UI_VIEW_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="];   // keys follow the toolbar order
 {
   const host = $("views");
-  for (const [k, v] of Object.entries(views)) {
-    const b = document.createElement("button"); b.type = "button"; b.dataset.view = k; b.textContent = v.label;
+  Object.entries(views).forEach(([k, v], i) => {
+    const b = document.createElement("button"), key = UI_VIEW_KEYS[i];
+    b.type = "button"; b.dataset.view = k; b.innerHTML = `<span>${v.label}</span>${key ? `<kbd>${key}</kbd>` : ""}`;
+    b.title = key ? `${v.label} view (key ${key})` : `${v.label} view`;
+    if (key) b.setAttribute("aria-keyshortcuts", key);
     b.setAttribute("aria-pressed", String(k === "iso")); host.appendChild(b);
-  }
+  });
 }
 let flight = null;
 function setView(name) {
@@ -69,6 +73,5 @@ controls.addEventListener("start", () => { flight = null; document.querySelector
 function resize() {
   const w = viewport.clientWidth, h = viewport.clientHeight;
   renderer.setSize(w, h, false); camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix();
-  if (typeof drawLanes === "function") drawLanes();
 }
 new ResizeObserver(resize).observe(viewport);
