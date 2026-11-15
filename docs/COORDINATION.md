@@ -15,7 +15,7 @@ While Claude was usage-limited (about 23:30–07:25), Codex coordinated: it merg
 | frame (30) | OpenCode (herdr w7:pB, renamed `frame`) | feat/frame | in progress |
 | robots (40, 41) | Copilot (herdr w7:p4, renamed `robots`) | feat/robots | in progress |
 | app (page, 50, 60, 70) | OpenCode (herdr w7:p3, renamed `app`), finishing the paused workflow's WIP | feat/app | in progress |
-| film tools (M3) | lead | feat/film | WIP from the paused workflow (audio, shot plan) |
+| film tools (M3) | Claude (herdr w7:p1, mini-factory-cell-setup) | feat/film | in progress (WIP: film-plan.mjs, audio.mjs) |
 | Blender pipeline (M4) | Codex first pass, now the lead (Claude) | feat/blender | first pass merged (588e1d9); Codex usage-limited until 12:25 |
 
 ## Next milestones
