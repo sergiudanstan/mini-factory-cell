@@ -5,22 +5,32 @@ const OUTFEED = (() => {
 
   const trayGeo = (() => {
     const list = [];
-    const body = new THREE.BoxGeometry(TRAY.w, TRAY.d, TRAY.t);
-    body.translate(0, 0, -TRAY.t / 2);
-    list.push(body);
+    const floorPlate = new THREE.BoxGeometry(TRAY.w, TRAY.d, TRAY.t - TRAY.pocket);
+    floorPlate.translate(0, 0, -TRAY.t + (TRAY.t - TRAY.pocket) / 2);
+    list.push(floorPlate);
 
+    const topShape = new THREE.Shape();
+    topShape.moveTo(-TRAY.w / 2, -TRAY.d / 2);
+    topShape.lineTo(TRAY.w / 2, -TRAY.d / 2);
+    topShape.lineTo(TRAY.w / 2, TRAY.d / 2);
+    topShape.lineTo(-TRAY.w / 2, TRAY.d / 2);
+    topShape.lineTo(-TRAY.w / 2, -TRAY.d / 2);
     for (let n = 0; n < 24; n++) {
       const [dx, dy] = traySlot(n);
-      const pocket = new THREE.CylinderGeometry(0.0105, 0.0105, TRAY.pocket, 18, 1, true);
-      pocket.rotateX(Math.PI / 2);
-      pocket.translate(dx, dy, TRAY.t / 2 - TRAY.pocket / 2);
-      list.push(pocket);
-
-      const floor = new THREE.CylinderGeometry(0.0105, 0.0105, 0.0015, 18, 1, false);
-      floor.rotateX(Math.PI / 2);
-      floor.translate(dx, dy, TRAY.t / 2 - TRAY.pocket + 0.00075);
-      list.push(floor);
+      const hole = new THREE.Path();
+      hole.absarc(dx, dy, 0.0105, 0, Math.PI * 2, true);
+      topShape.holes.push(hole);
+      const chamfer = new THREE.LatheGeometry([
+        new THREE.Vector2(0.0105, -0.0005),
+        new THREE.Vector2(0.011, 0),
+      ], 18);
+      chamfer.rotateX(Math.PI / 2);
+      chamfer.translate(dx, dy, 0);
+      list.push(chamfer);
     }
+    const pocketLayer = new THREE.ExtrudeGeometry(topShape, { depth: TRAY.pocket, bevelEnabled: false });
+    pocketLayer.translate(0, 0, -TRAY.pocket);
+    list.push(pocketLayer);
 
     const footGeo = new THREE.BoxGeometry(0.018, 0.018, 0.005);
     const feet = [
@@ -39,7 +49,8 @@ const OUTFEED = (() => {
     label.translate(0, 0, -0.003);
     list.push(label);
 
-    return BufferGeometryUtils.mergeGeometries(list, false);
+    const nonIndexed = list.map((geo) => geo.index ? geo.toNonIndexed() : geo);
+    return BufferGeometryUtils.mergeGeometries(nonIndexed, false);
   })();
 
   const trays = Array.from({ length: 6 }, (_, m) => {
@@ -65,11 +76,11 @@ const OUTFEED = (() => {
 
   const motor = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.070, 20), M.motorBlack);
   motor.rotation.z = Math.PI / 2;
-  motor.position.set(Ls.x1 - 0.06, Ls.y, Ls.z + 0.032);
+  motor.position.set(Ls.x1 + 0.055, Ls.y, Ls.z - 0.045);
   shuttle.add(motor);
 
   const gearbox = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.05, 0.05), M.gearboxSilver);
-  gearbox.position.set(Ls.x1 - 0.12, Ls.y, Ls.z + 0.028);
+  gearbox.position.set(Ls.x1 + 0.11, Ls.y, Ls.z - 0.050);
   shuttle.add(gearbox);
 
   const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.18, 12, 1, true), M.aluDark);
