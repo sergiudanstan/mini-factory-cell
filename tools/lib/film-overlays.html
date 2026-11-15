@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Film overlays</title>
+<!-- Transparent overlays for tools/film.mjs: window.renderOverlay(spec) draws one card, the tool screenshots it with
+     omitBackground. Sizes scale with the viewport width (1920 = 1 unit per px). Kinds: title, chapter, end, press-curve. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=block" rel="stylesheet">
+<style>
+  :root {
+    --u: calc(100vw / 1920);
+    --ink: #f4f6f8;
+    --muted: #c3cbd3;
+    --faint: rgba(244, 246, 248, 0.55);
+    --accent: #f2b01e;           /* safety amber */
+    --good: #57d38c;
+    --bad: #ff5a4f;
+    --panel: rgba(13, 16, 20, 0.74);
+    --line: rgba(255, 255, 255, 0.16);
+    --display: "Barlow Semi Condensed", "Noto Sans", system-ui, sans-serif;
+    --ui: "IBM Plex Sans", "Noto Sans", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", "Noto Sans Mono", ui-monospace, monospace;
+  }
+  html, body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; background: transparent; }
+  body { color: var(--ink); font-family: var(--ui); -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+  #stage { position: fixed; inset: 0; }
+  .shadow { text-shadow: 0 calc(2 * var(--u)) calc(14 * var(--u)) rgba(0, 0, 0, 0.55); }
+
+  /* ---- title card */
+  .scrim-bottom { position: absolute; left: 0; right: 0; bottom: 0; height: 56%;
+    background: linear-gradient(to top, rgba(6, 8, 10, 0.72), rgba(6, 8, 10, 0.38) 45%, rgba(6, 8, 10, 0)); }
+  .title { position: absolute; left: calc(120 * var(--u)); bottom: calc(118 * var(--u)); max-width: calc(1500 * var(--u));
+    padding-left: calc(34 * var(--u)); border-left: calc(8 * var(--u)) solid var(--accent); }
+  .title .over { font: 600 calc(26 * var(--u)) / 1 var(--mono); letter-spacing: 0.32em; text-transform: uppercase; color: var(--accent); }
+  .title h1 { margin: calc(18 * var(--u)) 0 calc(20 * var(--u)); font: 700 calc(132 * var(--u)) / 0.92 var(--display);
+    letter-spacing: 0.01em; text-transform: uppercase; }
+  .title .sub { font: 400 calc(33 * var(--u)) / 1.35 var(--ui); color: var(--muted); }
+
+  /* ---- chapter lower-third */
+  .chapter { position: absolute; left: calc(96 * var(--u)); bottom: calc(92 * var(--u)); display: flex; align-items: stretch;
+    background: var(--panel); border-radius: calc(4 * var(--u)); overflow: hidden; max-width: calc(1220 * var(--u));
+    box-shadow: 0 calc(10 * var(--u)) calc(40 * var(--u)) rgba(0, 0, 0, 0.35); }
+  .chapter .bar { width: calc(8 * var(--u)); background: var(--accent); flex: none; }
+  .chapter .num { flex: none; display: flex; align-items: center; padding: 0 calc(26 * var(--u)) 0 calc(28 * var(--u));
+    font: 500 calc(44 * var(--u)) / 1 var(--mono); color: var(--accent); border-right: 1px solid var(--line); }
+  .chapter .txt { padding: calc(22 * var(--u)) calc(38 * var(--u)) calc(24 * var(--u)) calc(28 * var(--u)); }
+  .chapter h2 { margin: 0; font: 600 calc(50 * var(--u)) / 1.02 var(--display); letter-spacing: 0.02em; text-transform: uppercase; }
+  .chapter p { margin: calc(9 * var(--u)) 0 0; font: 400 calc(27 * var(--u)) / 1.3 var(--ui); color: var(--muted); }
+
+  /* ---- end card */
+  .scrim-left { position: absolute; inset: 0;
+    background: linear-gradient(to right, rgba(6, 8, 10, 0.84), rgba(6, 8, 10, 0.62) 46%, rgba(6, 8, 10, 0.12) 78%, rgba(6, 8, 10, 0)); }
+  .end { position: absolute; left: calc(120 * var(--u)); top: 50%; transform: translateY(-50%); width: calc(1040 * var(--u)); }
+  .end .over { font: 600 calc(24 * var(--u)) / 1 var(--mono); letter-spacing: 0.32em; text-transform: uppercase; color: var(--accent); }
+  .end h1 { margin: calc(16 * var(--u)) 0 calc(34 * var(--u)); font: 700 calc(104 * var(--u)) / 0.92 var(--display); text-transform: uppercase; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); }
+  .stat { padding: calc(22 * var(--u)) calc(24 * var(--u)) calc(22 * var(--u)) 0; border-bottom: 1px solid var(--line); }
+  .stat b { display: block; font: 500 calc(56 * var(--u)) / 1 var(--mono); letter-spacing: -0.01em; }
+  .stat b small { font-size: 0.5em; color: var(--muted); margin-left: 0.25em; font-weight: 400; }
+  .stat span { display: block; margin-top: calc(10 * var(--u)); font: 500 calc(21 * var(--u)) / 1.2 var(--ui); letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--faint); }
+  .end .kit { margin-top: calc(30 * var(--u)); font: 400 calc(27 * var(--u)) / 1.4 var(--ui); color: var(--muted); }
+  .end .url { margin-top: calc(14 * var(--u)); font: 500 calc(25 * var(--u)) / 1 var(--mono); color: var(--ink); }
+
+  /* ---- press inset */
+  .inset { position: absolute; right: calc(88 * var(--u)); top: calc(84 * var(--u)); width: calc(600 * var(--u));
+    background: rgba(13, 16, 20, 0.88); border-radius: calc(4 * var(--u)); padding: calc(22 * var(--u)) calc(26 * var(--u)) calc(18 * var(--u));
+    box-shadow: 0 calc(10 * var(--u)) calc(40 * var(--u)) rgba(0, 0, 0, 0.35); border-top: calc(5 * var(--u)) solid var(--accent); }
+  .inset .hd { display: flex; justify-content: space-between; align-items: baseline; }
+  .inset .hd b { font: 600 calc(30 * var(--u)) / 1 var(--display); letter-spacing: 0.04em; text-transform: uppercase; }
+  .chip { font: 600 calc(22 * var(--u)) / 1 var(--mono); padding: calc(6 * var(--u)) calc(12 * var(--u)); border-radius: calc(3 * var(--u)); color: #101214; }
+  .chip.nok { background: var(--bad); } .chip.ok { background: var(--good); }
+  .inset svg { display: block; width: 100%; height: auto; margin-top: calc(14 * var(--u)); overflow: visible; }
+  .inset .ft { display: flex; justify-content: space-between; margin-top: calc(10 * var(--u)); font: 400 calc(20 * var(--u)) / 1.3 var(--mono); color: var(--muted); }
+  .legend i { display: inline-block; width: calc(22 * var(--u)); height: calc(4 * var(--u)); vertical-align: middle; margin: 0 calc(8 * var(--u)) 0 calc(14 * var(--u)); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script>
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const num = (v, d = 0) => (Number.isFinite(v) ? v.toLocaleString("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d }) : "–");
+
+function titleCard(s) {
+  return `<div class="scrim-bottom"></div>
+    <div class="title shadow"><div class="over">Browser digital twin</div><h1>${esc(s.text)}</h1><div class="sub">${esc(s.sub)}</div></div>`;
+}
+function chapterCard(s) {
+  return `<div class="chapter"><div class="bar"></div>${s.n ? `<div class="num">${esc(s.n)}</div>` : ""}
+    <div class="txt"><h2>${esc(s.text)}</h2>${s.sub ? `<p>${esc(s.sub)}</p>` : ""}</div></div>`;
+}
+function endCard(s) {
+  const st = s.stats || {};
+  const fpy = Number.isFinite(st.good) && Number.isFinite(st.rejected) && st.good + st.rejected > 0 ? (100 * st.good) / (st.good + st.rejected) : null;
+  const cells = [
+    [`${num(st.cycle, 2)}<small>s</small>`, "Cycle time"],
+    [`${num(st.perHour)}<small>/h</small>`, "Throughput"],
+    [`${num(st.good)}<small>good</small>`, `${num(st.rejected)} rejected in ${num(st.duration, 0)} s`],
+    [`${fpy === null ? "–" : num(fpy, 1)}<small>%</small>`, "First-pass yield"],
+    [`${num(st.index, 2)}<small>s</small>`, "Interlocked dial index"],
+    [`${esc(String(st.bottleneck || "delta"))}`, "Bottleneck"],
+  ];
+  return `<div class="scrim-left"></div>
+    <div class="end shadow"><div class="over">Push-button assembly</div><h1>${esc(s.text || s.title)}</h1>
+      <div class="stats">${cells.map(([b, l]) => `<div class="stat"><b>${b}</b><span>${l}</span></div>`).join("")}</div>
+      <div class="kit">Three vibratory bowl feeders · eight-station cam dial · servo press · vision · delta robot · Epson T3-B401S</div>
+      <div class="url">${esc(s.sub)}</div></div>`;
+}
+function pressInset(s) {
+  // chart in mm and N; viewBox units are px of a 560 x 300 plot
+  const W = 560, H = 300, X0 = 62, Y0 = 18, PW = W - X0 - 24, PH = H - Y0 - 40;
+  const xMax = 5, yMax = 25;
+  const X = (x) => X0 + (x / xMax) * PW, Y = (y) => Y0 + PH - (Math.min(y, yMax) / yMax) * PH;
+  const path = (c) => (c || []).filter((p) => p[0] <= xMax).map((p, i) => `${i ? "L" : "M"}${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join("");
+  const [w0, w1] = s.window || [3, 4.5], at = s.at ?? 4.5;
+  const grid = [];
+  for (let x = 0; x <= xMax; x++) grid.push(`<line x1="${X(x)}" y1="${Y0}" x2="${X(x)}" y2="${Y0 + PH}" stroke="rgba(255,255,255,0.10)"/>
+    <text x="${X(x)}" y="${Y0 + PH + 26}" fill="#c3cbd3" font-family="IBM Plex Mono, monospace" font-size="17" text-anchor="middle">${x === xMax ? `${x} mm` : x}</text>`);
+  for (let y = 0; y <= yMax; y += 5) grid.push(`<line x1="${X0}" y1="${Y(y)}" x2="${X0 + PW}" y2="${Y(y)}" stroke="rgba(255,255,255,0.10)"/>
+    <text x="${X0 - 10}" y="${Y(y) + 6}" fill="#c3cbd3" font-family="IBM Plex Mono, monospace" font-size="17" text-anchor="end">${y === yMax ? `${y} N` : y}</text>`);
+  const col = s.pass ? "#57d38c" : "#ff5a4f";
+  const f45 = Number.isFinite(s.f45) ? s.f45 : null;
+  const svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+    ${grid.join("")}
+    <rect x="${X(at) - 11}" y="${Y(w1)}" width="22" height="${Y(w0) - Y(w1)}" fill="rgba(242,176,30,0.22)" stroke="#f2b01e" stroke-width="2.5"/>
+    ${s.ref ? `<path d="${path(s.ref)}" fill="none" stroke="rgba(230,235,240,0.55)" stroke-width="3" stroke-dasharray="7 6"/>` : ""}
+    <path d="${path(s.curve)}" fill="none" stroke="${col}" stroke-width="4.5" stroke-linejoin="round"/>
+    ${f45 !== null ? `<circle cx="${X(at)}" cy="${Y(f45)}" r="7" fill="${col}" stroke="#101214" stroke-width="2"/>
+      <text x="${X(at) - 16}" y="${Y(f45) + 30}" fill="${col}" font-family="IBM Plex Mono, monospace" font-size="19" text-anchor="end">${num(f45, 1)} N</text>` : ""}
+    <text x="${X(at) - 16}" y="${Y(w1) - 26}" fill="#f2b01e" font-family="IBM Plex Mono, monospace" font-size="17" text-anchor="end">window ${num(w0, 1)}–${num(w1, 1)} N</text>
+  </svg>`;
+  return `<div class="inset"><div class="hd"><b>S4 force–travel · assembly ${esc(s.a)}</b><span class="chip ${s.pass ? "ok" : "nok"}">${s.pass ? "OK" : "NOK"}</span></div>
+    ${svg}
+    <div class="ft"><span class="legend"><i style="background:${col}"></i>this part<i style="background:rgba(230,235,240,0.55)"></i>good part</span>
+      <span>snap peak ${num(s.peak, 1)} N</span></div></div>`;
+}
+
+window.renderOverlay = (spec) => {
+  const stage = document.getElementById("stage");
+  const make = { title: titleCard, chapter: chapterCard, end: endCard, "press-curve": pressInset }[spec.kind];
+  if (!make) throw new Error(`unknown overlay kind ${spec.kind}`);
+  stage.innerHTML = make(spec);
+  return true;
+};
+</script>
+</body>
+</html>

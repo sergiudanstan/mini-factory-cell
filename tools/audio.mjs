@@ -403,7 +403,7 @@ export function renderFilmAudio({ plan, logic: L, seed, levels = {}, log = conso
     const P = { t: new Float64Array(nb), w: new Float64Array(nb) };
     const voices = [];   // { gl, gr, snd (per block), f (per block), amp (per block), harm, phase }
     const mk = (name, harm, group) => {
-      const v = { name, harm, group, f: new Float64Array(nb), a: new Float64Array(nb), gl: new Float64Array(nb), gr: new Float64Array(nb), snd: new Float64Array(nb), ph: harm.map(() => 0), noise: harm === null };
+      const v = { name, harm, group, f: new Float64Array(nb), a: new Float64Array(nb), gl: new Float64Array(nb), gr: new Float64Array(nb), snd: new Float64Array(nb), ph: harm ? harm.map(() => 0) : [], noise: harm === null };
       voices.push(v);
       return v;
     };
