@@ -298,8 +298,10 @@ window.pc = {
   get minClear() { return minClear; }, get ikFail() { return ikFail; }, get S() { return S; }, get time() { return time; },
   views: Object.keys(views), modules: Object.keys(MODULES),
   seek, pause: () => setPlaying(false), play: () => setPlaying(true), setView, setOpts: refreshModel,
-  setCamera: (pos, target) => {
+  setCamera: (pos, target, fov) => {   // scene frame; fov in degrees (vertical), default 34 = the page default
     flight = null;
+    if (!Number.isFinite(fov)) fov = 34;
+    if (Math.abs(camera.fov - fov) > 1e-6) { camera.fov = fov; camera.updateProjectionMatrix(); }
     camera.position.set(pos[0], pos[1], pos[2]);
     controls.target.set(target[0], target[1], target[2]);
     controls.update();

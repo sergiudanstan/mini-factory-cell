@@ -64,6 +64,7 @@ const UI_VIEW_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="
 let flight = null;
 function setView(name) {
   const v = views[name]; if (!v) return;
+  if (camera.fov !== 34) { camera.fov = 34; camera.updateProjectionMatrix(); }   // a film fov never sticks to the views
   flight = { t: 0, fromP: camera.position.clone(), fromT: controls.target.clone(), toP: v.pos.clone(), toT: v.target.clone() };
   document.querySelectorAll(".views button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === name)));
 }
