@@ -641,7 +641,7 @@ function uiBowlModel() {
     return { lv, hop };
   });
 }
-const UI_TRK = { x0: 10, x1: 240, w: 262 };
+const UI_TRK = { x0: 10, x1: 240, w: 280 };   // viewBox is wider than the rail so the bowl label stays inside the card
 const UI_PD = { A: [PART.A.flangeD, 12], B: [PART.B.od, 8], C: [PART.C.d, 9] };   // footprint along the track (m), drawn height (px)
 const uiTrkX = (f, s) => UI_TRK.x0 + (s / f.track) * (UI_TRK.x1 - UI_TRK.x0);
 const feederRows = FEED.map((f) => {
