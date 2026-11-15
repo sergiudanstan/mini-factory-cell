@@ -7,3 +7,4 @@ _cad/
 _shots/
 _frames/
 *.tmp
+__pycache__/

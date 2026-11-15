@@ -23,9 +23,9 @@ The aim is **realism**: real equipment sizes, colours and timings (RNA feeders, 
 
 | Part | Material | Size | Notes |
 |---|---|---|---|
-| A housing | PA66, black | body Ø20 × 20, flange Ø24 × 2 on top, total 22 | Ø13 bore from 4 mm above the bottom; 2 snap windows (4 × 3 mm, z 14.5–17.5) on opposite sides; a key slot in the flange along +x |
+| A housing | PA66, black | body Ø20 × 20, flange Ø24 × 2 on top, total 22 | Ø13 bore from 4 mm above the bottom; 2 snap windows (4 × 3 mm, z 14.5–17.5) through the wall on ±y; a key slot in the flange along +x |
 | B spring | music wire 0.6 | OD 7, free length 13, 7.5 coils, closed and ground ends | rate 0.82 N/mm; installed length 10 |
-| C cap / plunger | PA, red (RAL 3020-like) | Ø12.5 × 15, domed top | 2 snap hooks (legs) on ±x, a key rib; slides into the Ø13 bore |
+| C cap / plunger | PA, red (RAL 3020-like) | Ø12.5 × 15: straight cylinder to z 12.5, low spherical dome to z 15 | 2 snap hooks on ±y: vertical cantilever legs flush with the body, hanging 3 mm below the body bottom, small outward barbs (they sit inside the bore and engage the windows); a key rib along +x; slides into the Ø13 bore |
 
 **Stack in the housing** (component bottom above the housing bottom, `STACK`):
 - B sits on the bore floor at 0.004.
