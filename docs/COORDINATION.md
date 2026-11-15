@@ -10,8 +10,8 @@ While Claude was usage-limited (about 23:30–07:25), Codex coordinated: it merg
 |---|---|---|---|
 | bowls (33) | Codex (herdr w7:p2) | feat/bowls | merged into main (de9f49b) |
 | hall (31) | OpenCode (herdr w7:pB) | feat/hall | merged into main (46585a5) |
-| dial (34) | OpenCode (herdr w7:p3) | feat/dial | DONE (72d5033), lead review |
-| product + outfeed (24, 36) | Copilot (herdr w7:p4) | feat/product | review fixes DONE (fef62a0), lead review |
+| dial (34) | OpenCode (herdr w7:p3) | feat/dial | merged into main |
+| product + outfeed (24, 36) | Copilot (herdr w7:p4) | feat/product | merged into main (fef62a0, cap and tray verified in close-up) |
 | frame (30) | OpenCode (herdr w7:pB, renamed `frame`) | feat/frame | in progress |
 | robots (40, 41) | Copilot (herdr w7:p4, renamed `robots`) | feat/robots | in progress |
 | app (page, 50, 60, 70) | OpenCode (herdr w7:p3, renamed `app`), finishing the paused workflow's WIP | feat/app | in progress |
