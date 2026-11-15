@@ -10,7 +10,9 @@
    node tools/shots.mjs --port <port> --view <views> --t 2.5,12,30 --out _shots/<name>      # 0 console errors required
    node tools/shots.mjs --port <port> --solo <module> --view <views> --t 12 --out _shots/<name>-solo
    node tools/stats.mjs --port <port> --solo <module>                                      # draw calls within budget
+   node tools/shots.mjs --port <port> --cam x,y,z --target x,y,z --t 12 --clean --out _shots/<name>-macro   # close-up, cell frame (z up)
    ```
+   Always check your parts in close-up (camera 0.1–0.3 m away): most defects only show there.
    Only one Chrome at a time on this machine (about 3 GB RAM free): run the tools one after another, never in parallel.
    If you can look at images, open your PNGs and judge them against the realism checklist like a picky industrial engineer, then iterate.
 5. Commit on your branch only: `git add <your files> docs/tasks/<name>.report.md && git commit -m "<Module>: <what> (M1)"`. Do NOT push, do NOT merge, do NOT rebase onto main unless the lead asks.
