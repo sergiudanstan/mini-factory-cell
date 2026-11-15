@@ -2,6 +2,7 @@
 // pc.renderInfo() and pc.checks(). Exits 1 on any console or page error.
 // Usage: node tools/shots.mjs [--quick] [--view iso,top] [--t 2.5,12,30] [--solo NAME] [--cad]
 //          [--size 1600x900] [--hq on|off] [--out DIR] [--tag STR] [--root DIR] [--port N] [--headed]
+//          [--cam x,y,z --target x,y,z (cell frame, z up)] [--clean (no UI overlays)]
 import { mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { REPO, parseFlags, startSession, openCell, frames, settleQuality, measureFps, reportFatal } from "./lib/browser.mjs";
@@ -17,6 +18,9 @@ const flags = parseFlags({
   settle: { type: "int", default: 1200, help: "ms to wait after setView (0.8 s camera flight)" },
   out: { type: "string", default: join(REPO, "_shots/latest"), help: "output folder; old PNGs in it are deleted" },
   tag: { type: "string", default: "", help: "file name prefix" },
+  cam: { type: "nums", help: "custom camera position x,y,z in the CELL frame (z up); replaces --view" },
+  target: { type: "nums", help: "custom camera target x,y,z in the CELL frame (with --cam)" },
+  clean: { type: "bool", help: "hide the UI overlays and drawer (canvas-like close-ups)" },
 }, "node tools/shots.mjs [flags]");
 
 const tName = (t) => (Number.isInteger(t * 10) ? t.toFixed(1) : String(t));
@@ -39,8 +43,10 @@ try {
   }));
   if (info.missing.length) throw new Error(`window.pc is missing ${info.missing.join(", ")}`);
   if (!info.views.length) throw new Error("window.pcViews is missing or empty");
-  let views = flags.view || info.views;
-  const unknown = views.filter((v) => !info.views.includes(v));
+  const custom = flags.cam ? { pos: flags.cam, target: flags.target || [0, 0, 0.22] } : null;
+  if (custom && (custom.pos.length !== 3 || custom.target.length !== 3)) throw new Error("--cam and --target need x,y,z");
+  let views = custom ? ["cam"] : flags.view || info.views;
+  const unknown = custom ? [] : views.filter((v) => !info.views.includes(v));
   if (unknown.length) throw new Error(`unknown view(s) ${unknown.join(", ")}; window.pcViews has ${info.views.join(", ")}`);
   let times = flags.t;
   if (flags.quick) { views = views.slice(0, 2); times = times.slice(0, 1); }
@@ -55,13 +61,17 @@ try {
   // old PNGs go only once the page is known to work
   mkdirSync(out, { recursive: true });
   for (const f of readdirSync(out)) if (f.endsWith(".png")) rmSync(join(out, f), { force: true });
+  if (flags.clean) await page.evaluate(() => { document.querySelectorAll(".overlay, .drawer, .rail").forEach((e) => { e.style.visibility = "hidden"; }); });
   for (const v of views) {
     for (const t of times) {
-      await page.evaluate(({ v, t }) => {
+      await page.evaluate(({ v, t, custom }) => {
         window.pc.pause();
         window.pc.seek(t);
-        window.pc.setView(v);
-      }, { v, t });
+        if (custom) {   // cell (x, y, z up) -> three.js scene (x, z, -y)
+          const c = custom.pos, g = custom.target;
+          window.pc.setCamera([c[0], c[2], -c[1]], [g[0], g[2], -g[1]]);
+        } else window.pc.setView(v);
+      }, { v, t, custom });
       // the flight advances by at most 0.1 s per frame, so slow (software) frames need >= 10 of them
       await Promise.all([page.waitForTimeout(flags.settle), frames(page, 10)]);
       await frames(page, 2);
