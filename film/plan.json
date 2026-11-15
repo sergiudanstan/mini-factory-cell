@@ -1,0 +1,709 @@
+{
+  "_about": "Shot plan of the mini-factory-cell film. Positions are in the CELL frame: metres, z up, origin = dial centre on the machine-base top, floor z = -0.82. 'sim' is program time (s), mapped linearly over 'dur' film seconds (dur > sim span = slow motion). 'u' runs 0..1 over the segment. Edit, then check with: node tools/film.mjs --check, and look with: node tools/film.mjs --preview. Event times are from the default run (DURATION 59.17 s, cycle 2.188 s).",
+  "fps": 30,
+  "size": [
+    1920,
+    1080
+  ],
+  "title": "Mini Factory Cell",
+  "subtitle": "Push-button assembly cell",
+  "fadeIn": 1.0,
+  "fadeOut": 1.5,
+  "audio": {
+    "seed": 7,
+    "fx": [
+      {
+        "kind": "swell",
+        "at": 0.0,
+        "dur": 7.5,
+        "peakDb": -24,
+        "f": 55
+      },
+      {
+        "kind": "swell",
+        "at": 54.5,
+        "dur": 9.0,
+        "peakDb": -24,
+        "f": 49
+      }
+    ]
+  },
+  "segments": [
+    {
+      "label": "Hall",
+      "note": "Establishing crane-in from the far corner of the hall down to the guarded cell.",
+      "dur": 8.0,
+      "sim": [
+        0.0,
+        8.0
+      ],
+      "ease": "out-sine",
+      "cam": [
+        {
+          "u": 0.0,
+          "pos": [
+            10.5,
+            -6.0,
+            4.4
+          ],
+          "target": [
+            0.2,
+            0.3,
+            0.1
+          ],
+          "fov": 34
+        },
+        {
+          "u": 0.6,
+          "pos": [
+            6.0,
+            -4.8,
+            2.4
+          ],
+          "target": [
+            0.05,
+            0.25,
+            0.2
+          ]
+        },
+        {
+          "u": 1.0,
+          "pos": [
+            3.3,
+            -3.4,
+            1.45
+          ],
+          "target": [
+            0.0,
+            0.25,
+            0.25
+          ],
+          "fov": 32
+        }
+      ],
+      "caption": {
+        "style": "title",
+        "text": "Mini Factory Cell",
+        "sub": "Push-button assembly · three bowl feeders · eight-station dial · delta robot · Epson T3-B401S",
+        "in": 1.2,
+        "out": 6.4
+      }
+    },
+    {
+      "label": "Bowl feeders",
+      "note": "High glide inside the guard, right to left, looking down into the bowls: C caps, B springs, A housings.",
+      "dur": 6.0,
+      "sim": [
+        6.5,
+        12.5
+      ],
+      "xfade": 0.8,
+      "ease": "sine",
+      "cam": [
+        {
+          "u": 0.0,
+          "pos": [
+            1.1,
+            0.25,
+            1.1
+          ],
+          "target": [
+            0.66,
+            0.55,
+            0.18
+          ],
+          "fov": 34
+        },
+        {
+          "u": 0.5,
+          "pos": [
+            0.05,
+            0.98,
+            1.12
+          ],
+          "target": [
+            -0.13,
+            1.12,
+            0.12
+          ]
+        },
+        {
+          "u": 1.0,
+          "pos": [
+            -1.15,
+            0.3,
+            1.15
+          ],
+          "target": [
+            -0.93,
+            0.65,
+            0.15
+          ]
+        }
+      ],
+      "caption": {
+        "style": "chapter",
+        "n": "01",
+        "text": "Feeding",
+        "sub": "Three vibratory bowl feeders orient housings, springs and caps",
+        "in": 0.8,
+        "out": 5.0
+      }
+    },
+    {
+      "label": "Feeder A pick",
+      "note": "Macro at the housing pick nest (-0.424, 0.424): queue, escapement, delta fingers close on a housing (pick at sim 12.89).",
+      "dur": 3.4,
+      "sim": [
+        12.4,
+        13.4
+      ],
+      "xfade": 0.3,
+      "cam": [
+        {
+          "u": 0.0,
+          "pos": [
+            -0.25,
+            0.28,
+            0.32
+          ],
+          "target": [
+            -0.44,
+            0.44,
+            0.22
+          ],
+          "fov": 30
+        },
+        {
+          "u": 1.0,
+          "pos": [
+            -0.28,
+            0.31,
+            0.3
+          ],
+          "target": [
+            -0.44,
+            0.44,
+            0.225
+          ],
+          "fov": 27
+        }
+      ],
+      "caption": {
+        "style": "chapter",
+        "n": "02",
+        "text": "Escapement and pick",
+        "sub": "One part released per pick, fibre sensors confirm the nest",
+        "in": 0.3,
+        "out": 3.0
+      }
+    },
+    {
+      "label": "Delta loading",
+      "note": "Elevated 3/4 view of the delta serving the three feeders and stations S1-S3.",
+      "dur": 3.6,
+      "sim": [
+        13.4,
+        15.9
+      ],
+      "xfade": 0.4,
+      "cam": [
+        {
+          "u": 0.0,
+          "pos": [
+            1.0,
+            -0.55,
+            1.05
+          ],
+          "target": [
+            0.0,
+            0.38,
+            0.3
+          ],
+          "fov": 36
+        },
+        {
+          "u": 1.0,
+          "pos": [
+            0.8,
+            -0.7,
+            1.0
+          ],
+          "target": [
+            -0.05,
+            0.36,
+            0.3
+          ],
+          "fov": 36
+        }
+      ],
+      "caption": {
+        "style": "chapter",
+        "n": "03",
+        "text": "Loading",
+        "sub": "The delta makes three picks in every 2.19 s cycle",
+        "in": 0.3,
+        "out": 3.3
+      }
+    },
+    {
+      "label": "Spring drop",
+      "note": "0.2x slow motion at S2 (0, 0.30): the delta opens its fingers and the spring drops into the housing bore (sim 16.08).",
+      "dur": 3.0,
+      "sim": [
+        15.85,
+        16.45
+      ],
+      "xfade": 0.3,
+      "cam": [
+        {
+          "u": 0.0,
+          "pos": [
+            0.2,
+            0.44,
+            0.31
+          ],
+          "target": [
+            0.0,
+            0.3,
+            0.235
+          ],
+          "fov": 26
+        },
+        {
+          "u": 1.0,
+          "pos": [
+            0.18,
+            0.42,
+            0.3
+          ],
+          "target": [
+            0.0,
+            0.3,
+            0.235
+          ],
+          "fov": 24
+        }
+      ]
+    },
+    {
+      "label": "Dial index",
+      "note": "Low side view from the left: nests sweep past S8 and S1 while the TC220T-class indexer and its geared motor index the dial (sim 16.90 and 19.09).",
+      "dur": 3.6,
+      "sim": [
+        16.45,
+        19.95
+      ],
+      "xfade": 0.4,
+      "cam": [
+        {
+          "u": 0.0,
+          "pos": [
+            -0.74,
+            -0.14,
+            0.38
+          ],
+          "target": [
+            -0.22,
+            0.05,
+            0.16
+          ],
+          "fov": 32
+        },
+        {
+          "u": 1.0,
+          "pos": [
+            -0.66,
+            -0.06,
+            0.35
+          ],
+          "target": [
+            -0.2,
+            0.06,
+            0.16
+          ],
+          "fov": 30
+        }
+      ],
+      "caption": {
+        "style": "chapter",
+        "n": "04",
+        "text": "Interlocked dial",
+        "sub": "Cam indexer, modified-sine 0.42 s index: it moves only when every tool has left its nest",
+        "in": 0.3,
+        "out": 3.4
+      }
+    },
+    {
+      "label": "Press test",
+      "note": "0.22x macro at S4 (0.30, 0): servo press snaps the cap of assembly 8 and measures the spring (weak spring, NOK).",
+      "dur": 3.6,
+      "sim": [
+        10.7,
+        11.5
+      ],
+      "xfade": 0.3,
+      "cam": [
+        {
+          "u": 0.0,
+          "pos": [
+            0.56,
+            -0.17,
+            0.32
+          ],
+          "target": [
+            0.3,
+            0.0,
+            0.25
+          ],
+          "fov": 26
+        },
+        {
+          "u": 1.0,
+          "pos": [
+            0.53,
+            -0.14,
+            0.31
+          ],
+          "target": [
+            0.3,
+            0.0,
+            0.25
+          ],
+          "fov": 24
+        }
+      ],
+      "caption": {
+        "style": "chapter",
+        "n": "05",
+        "text": "Snap and force–travel test",
+        "sub": "Assembly 8: 2.4 N at 4.5 mm, below the 3.0–4.5 N window",
+        "in": 0.2,
+        "out": 3.3
+      },
+      "inset": {
+        "kind": "press-curve",
+        "in": 0.5,
+        "out": 3.4
+      }
+    },
+    {
+      "label": "Reject 1",
+      "note": "Front of the dial: the pneumatic unit at S6 (0, -0.30) lifts assembly 8 and drops it into the red bin (sim 15.13-15.99).",
+      "dur": 3.3,
+      "sim": [
+        15.05,
+        16.15
+      ],
+      "xfade": 0.3,
+      "cam": [
+        {
+          "u": 0.0,
+          "pos": [
+            -0.45,
+            -0.95,
+            0.62
+          ],
+          "target": [
+            0.0,
+            -0.4,
+            0.22
+          ],
+          "fov": 32
+        },
+        {
+          "u": 1.0,
+          "pos": [
+            -0.38,
+            -0.98,
+            0.58
+          ],
+          "target": [
+            0.0,
+            -0.42,
+            0.21
+          ],
+          "fov": 32
+        }
+      ],
+      "caption": {
+        "style": "chapter",
+        "n": "06",
+        "text": "Reject",
+        "sub": "The weak spring goes to the locked red bin",
+        "in": 0.2,
+        "out": 3.0
+      }
+    },
+    {
+      "label": "Vision check",
+      "note": "0.23x macro at S5 (0.212, -0.212): the camera flags assembly 15 (sim 28.31).",
+      "dur": 3.0,
+      "sim": [
+        28.15,
+        28.85
+      ],
+      "xfade": 0.3,
+      "cam": [
+        {
+          "u": 0.0,
+          "pos": [
+            0.47,
+            -0.42,
+            0.33
+          ],
+          "target": [
+            0.212,
+            -0.212,
+            0.28
+          ],
+          "fov": 26
+        },
+        {
+          "u": 1.0,
+          "pos": [
+            0.45,
+            -0.4,
+            0.32
+          ],
+          "target": [
+            0.212,
+            -0.212,
+            0.28
+          ],
+          "fov": 24
+        }
+      ],
+      "caption": {
+        "style": "chapter",
+        "n": "07",
+        "text": "Vision",
+        "sub": "Assembly 15: cap tilted 4.2°, one hook not latched",
+        "in": 0.2,
+        "out": 2.8
+      }
+    },
+    {
+      "label": "Reject 2",
+      "note": "S6 from the right: assembly 15 into the bin (sim 30.45-31.31).",
+      "dur": 3.0,
+      "sim": [
+        30.35,
+        31.85
+      ],
+      "xfade": 0.3,
+      "cam": [
+        {
+          "u": 0.0,
+          "pos": [
+            0.42,
+            -0.92,
+            0.58
+          ],
+          "target": [
+            0.0,
+            -0.42,
+            0.2
+          ],
+          "fov": 32
+        },
+        {
+          "u": 1.0,
+          "pos": [
+            0.36,
+            -0.95,
+            0.55
+          ],
+          "target": [
+            0.0,
+            -0.43,
+            0.2
+          ],
+          "fov": 32
+        }
+      ]
+    },
+    {
+      "label": "Palletising",
+      "note": "The T3-B401S (-0.50, -0.40) unloads S7 and places good parts in the tray (places at sim 35.88 and 38.03).",
+      "dur": 5.0,
+      "sim": [
+        33.6,
+        38.6
+      ],
+      "xfade": 0.5,
+      "cam": [
+        {
+          "u": 0.0,
+          "pos": [
+            -1.1,
+            -1.02,
+            0.98
+          ],
+          "target": [
+            -0.36,
+            -0.4,
+            0.24
+          ],
+          "fov": 36
+        },
+        {
+          "u": 1.0,
+          "pos": [
+            -0.95,
+            -1.06,
+            0.92
+          ],
+          "target": [
+            -0.33,
+            -0.42,
+            0.24
+          ],
+          "fov": 36
+        }
+      ],
+      "caption": {
+        "style": "chapter",
+        "n": "08",
+        "text": "Palletising",
+        "sub": "The Epson T3-B401S fills 4 × 6 trays in pattern order",
+        "in": 0.4,
+        "out": 4.2
+      }
+    },
+    {
+      "label": "Tray exchange",
+      "note": "Outside the left guard: the shuttle brings the full tray out to the magazine, the pusher moves it to the full-tray table at x = -1.70, an empty tray drops and goes in (sim 22.98-25.78).",
+      "dur": 4.5,
+      "sim": [
+        22.7,
+        26.2
+      ],
+      "xfade": 0.5,
+      "cam": [
+        {
+          "u": 0.0,
+          "pos": [
+            -2.2,
+            -1.3,
+            0.85
+          ],
+          "target": [
+            -1.5,
+            -0.6,
+            0.17
+          ],
+          "fov": 34
+        },
+        {
+          "u": 1.0,
+          "pos": [
+            -2.1,
+            -1.4,
+            0.8
+          ],
+          "target": [
+            -1.42,
+            -0.6,
+            0.17
+          ],
+          "fov": 34
+        }
+      ],
+      "caption": {
+        "style": "chapter",
+        "n": "09",
+        "text": "Tray exchange",
+        "sub": "Full tray out, empty tray in, while the SCARA keeps working",
+        "in": 0.4,
+        "out": 3.9
+      }
+    },
+    {
+      "label": "Orbit",
+      "note": "Slow rising orbit around the whole cell, outside the guard.",
+      "dur": 10.0,
+      "sim": [
+        38.6,
+        48.6
+      ],
+      "xfade": 0.8,
+      "ease": "sine",
+      "orbit": {
+        "target": [
+          0.0,
+          0.25,
+          0.25
+        ],
+        "radius": 2.8,
+        "z": 2.0,
+        "a0": -40,
+        "a1": -160,
+        "fov": 34,
+        "r1": 3.0,
+        "z1": 2.2
+      }
+    },
+    {
+      "label": "Outro",
+      "note": "Pull out and up into the hall; the end card holds the run's numbers.",
+      "dur": 10.0,
+      "sim": [
+        48.6,
+        58.6
+      ],
+      "xfade": 1.0,
+      "ease": "sine",
+      "cam": [
+        {
+          "u": 0.0,
+          "pos": [
+            -2.819,
+            -0.776,
+            2.2
+          ],
+          "target": [
+            0.0,
+            0.25,
+            0.25
+          ],
+          "fov": 34
+        },
+        {
+          "u": 0.5,
+          "pos": [
+            -5.6,
+            -3.3,
+            3.0
+          ],
+          "target": [
+            0.1,
+            0.25,
+            0.3
+          ]
+        },
+        {
+          "u": 1.0,
+          "pos": [
+            -9.0,
+            -5.6,
+            4.6
+          ],
+          "target": [
+            0.4,
+            0.4,
+            0.5
+          ],
+          "fov": 34
+        }
+      ],
+      "caption": {
+        "style": "end",
+        "text": "Mini Factory Cell",
+        "sub": "Browser digital twin · sergiudanstan.github.io/mini-factory-cell",
+        "in": 3.5,
+        "out": 9.9
+      }
+    }
+  ]
+}
