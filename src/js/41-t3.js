@@ -66,9 +66,28 @@ function buildT3(sd) {
   const root = new THREE.Group(); root.name = "scara_base"; root.position.set(sd.x, sd.y, T3G.riser); root.rotation.z = sd.face; t3Group.add(root);
   // Pedestal remains separate from proc.base so the optional CAD can replace the robot alone.
   const pedestal = new THREE.Group(); root.add(pedestal);
-  rbox(0.210, 0.170, 0.015, 0.003, M.aluClear, -0.055, 0, -0.0075, pedestal);
-  rbox(0.240, 0.200, 0.015, 0.003, M.aluClear, -0.055, 0, -T3G.riser + 0.0075, pedestal);
-  for (const x of [-0.135, 0.025]) for (const y of [-0.060, 0.060]) profileBeam(V(x, y, -T3G.riser + 0.015), V(x, y, -0.015), pedestal);
+  const pedestalX = -0.055, flangeT = 0.015, columnH = T3G.riser - 2 * flangeT;
+  rbox(LAYOUT.t3.plate, LAYOUT.t3.plate, flangeT, 0.004, M.aluClear, pedestalX, 0, -flangeT / 2, pedestal);
+  rbox(0.280, 0.240, flangeT, 0.004, M.aluClear, pedestalX, 0, -T3G.riser + flangeT / 2, pedestal);
+  rbox(0.145, 0.145, columnH, 0.008, M.aluClear, pedestalX, 0, -T3G.riser / 2, pedestal);
+  for (const x of [-0.112, 0.002]) for (const y of [-0.090, 0.090]) {
+    const bolt = t3Cylinder(0.005, 0, 0.003, M.aluClear, x, y, pedestal);
+    bolt.position.z = -T3G.riser + flangeT;
+  }
+  for (const x of [-LAYOUT.t3.pattern / 2, LAYOUT.t3.pattern / 2]) for (const y of [-LAYOUT.t3.pattern / 2, LAYOUT.t3.pattern / 2]) {
+    const bolt = t3Cylinder(0.004, 0, 0.0025, M.aluClear, pedestalX + x, y, pedestal);
+    bolt.position.z = -0.0025;
+  }
+  const cablePort = t3Cylinder(0.012, 0, 0.006, M.aluClear, 0, 0, pedestal);
+  cablePort.rotation.y = -Math.PI / 2; cablePort.position.set(pedestalX - 0.070, 0, -T3G.riser / 2);
+  const cableGrommet = t3Cylinder(0.009, 0, 0.004, M.blackRubber, 0, 0, pedestal);
+  cableGrommet.rotation.y = -Math.PI / 2; cableGrommet.position.set(pedestalX - 0.074, 0, -T3G.riser / 2);
+  tubeAlong([
+    V(pedestalX - 0.077, 0, -T3G.riser / 2),
+    V(pedestalX - 0.092, 0, -T3G.riser / 2 - 0.012),
+    V(pedestalX - 0.105, 0, -T3G.riser + 0.035),
+    V(pedestalX - 0.120, 0, -T3G.riser + 0.020),
+  ], 0.006, M.blackRubber, pedestal, 48, 10);
   const tag = labelPlane("T3-B401S", 0.070, 0.012, { bg: "#2f4fb8", fg: "#ffffff" });
   tag.position.set(0.0651, 0, -T3G.riser + 0.0075); tag.rotation.set(Math.PI / 2, 0, Math.PI / 2); pedestal.add(tag);
   mergeT3Link(pedestal);
@@ -84,14 +103,14 @@ function buildT3(sd) {
   led.rotation.x = Math.PI / 2; led.position.set(-0.040, 0.030, 0.416);
   rbox(0.002, 0.090, 0.150, 0.0005, M.t3Dark, -0.141, 0, 0.100, base);
   // Rear connector dimensions follow the table; small port recesses approximate the drawing.
-  for (const z of [0.095, 0.145]) rbox(0.004, 0.012, 0.045, 0.001, M.steel, -0.144, 0.012, z, base);
-  rbox(0.006, 0.040, 0.012, 0.002, M.steel, -0.145, 0, 0.077, base);
-  rbox(0.008, 0.014, 0.015, 0.001, M.steel, -0.146, 0.030, 0.113, base);
-  rbox(0.009, 0.009, 0.010, 0.001, M.blackPlastic, -0.147, 0.030, 0.113, base);
-  rbox(0.007, 0.012, 0.006, 0.001, M.steel, -0.145, 0.030, 0.139, base);
-  rbox(0.008, 0.009, 0.003, 0.0005, M.blackPlastic, -0.146, 0.030, 0.139, base);
+  for (const z of [0.095, 0.145]) rbox(0.004, 0.012, 0.045, 0.001, M.t3Dark, -0.144, 0.012, z, base);
+  rbox(0.006, 0.040, 0.012, 0.002, M.t3Dark, -0.145, 0, 0.077, base);
+  rbox(0.008, 0.014, 0.015, 0.001, M.t3Dark, -0.146, 0.030, 0.113, base);
+  rbox(0.009, 0.009, 0.010, 0.001, M.t3Dark, -0.147, 0.030, 0.113, base);
+  rbox(0.007, 0.012, 0.006, 0.001, M.t3Dark, -0.145, 0.030, 0.139, base);
+  rbox(0.008, 0.009, 0.003, 0.0005, M.t3Dark, -0.146, 0.030, 0.139, base);
   rbox(0.010, 0.050, 0.040, 0.003, M.t3Dark, -0.147, 0, 0.048, base);
-  for (const [z, r, material] of [[0.085, 0.003, M.puBlue], [0.106, 0.003, M.puBlue], [0.127, 0.002, M.puBlue], [0.148, 0.003, M.whitePOM]]) {
+  for (const [z, r, material] of [[0.085, 0.003, M.puBlue], [0.106, 0.003, M.puBlue], [0.127, 0.002, M.puBlue], [0.148, 0.003, M.puBlue]]) {
     const fitting = t3Cylinder(r, 0, 0.012, material, 0, 0, base); fitting.rotation.y = -Math.PI / 2; fitting.position.set(-0.142, -0.030, z);
   }
   const tp = t3Cylinder(0.012, 0, 0.008, M.t3Dark, 0, 0, base); tp.rotation.y = -Math.PI / 2; tp.position.set(-0.145, 0, 0.313);
@@ -104,7 +123,7 @@ function buildT3(sd) {
   arm1.geometry.translate(-bounds.min.x, -bounds.min.y, -bounds.min.z);
   arm1.geometry.scale((T3.L1 + 0.078) / size.x, 0.078 / size.y, 0.035 / size.z);
   arm1.geometry.translate(-0.039, -0.039, T3G.a1[0]);
-  t3Cylinder(0.045, 0.186, 0.192, M.t3Dark, 0, 0, j1);
+  t3Cylinder(0.045, 0.186, 0.192, M.duct, 0, 0, j1);
   const points = [V(0, 0, 0.446), V(0, 0, 0.486)];
   for (let i = 1; i <= 24; i++) { const a = Math.PI - i * Math.PI / 24; points.push(V(0.1125 + 0.1125 * Math.cos(a), 0, 0.486 + 0.1125 * Math.sin(a))); }
   points.push(V(0.225, 0, 0.4427)); tubeAlong(points, T3G.ductR, M.duct, j1, 96, 16);
@@ -118,21 +137,36 @@ function buildT3(sd) {
   t3Cylinder(0.041, 0.2345, 0.2375, M.t3Dark, 0.175, 0, j2);
   t3Cylinder(0.022, 0.4127, 0.4427, M.t3Dark, 0, 0, j2);
   rbox(0.031, 0.013, 0.006, 0.001, M.t3Dark, 0.040, 0.025, 0.410, j2);
-  for (const [x, y, r] of [[0.045, -0.022, 0.003], [0.065, -0.022, 0.003], [0.065, 0, 0.002]]) t3Cylinder(r, 0.405, 0.417, M.puBlue, x, y, j2);
+  for (const y of [-0.035, 0.035]) t3Cylinder(0.0035, 0.405, 0.420, M.puBlue, 0.045, y, j2);
   t3Cylinder(0.006, 0.389, 0.395, M.t3Dark, 0.110, 0.022, j2);
   const quill = new THREE.Group(); quill.name = "scara_quill"; t3Group.add(quill);
   t3Cylinder(0.008, T3G.tool, T3G.tool + T3G.shaftLen, t3ShaftMaterial, 0, 0, quill);
-  t3Cylinder(0.015, T3G.tool + T3G.shaftLen - 0.012, T3G.tool + T3G.shaftLen, M.steel, 0, 0, quill);   // upper stop collar at the shaft top
-  t3Cylinder(0.015, T3G.tool + 0.030, T3G.tool + 0.040, M.steel, 0, 0, quill);                         // lower mechanical stop, 30 mm above the shaft end
+  t3Cylinder(0.015, T3G.tool + T3G.shaftLen - 0.012, T3G.tool + T3G.shaftLen, t3ShaftMaterial, 0, 0, quill);   // upper stop collar at the shaft top
+  t3Cylinder(0.015, T3G.tool + 0.030, T3G.tool + 0.040, t3ShaftMaterial, 0, 0, quill);                         // lower mechanical stop, 30 mm above the shaft end
   const gripper = new THREE.Group(); quill.add(gripper);
   t3Cylinder(0.016, 0.055, T3G.tool, M.aluDark, 0, 0, gripper);                                         // split-muff coupling up to the shaft end
   rbox(0.034, 0.046, 0.030, 0.003, M.aluDark, 0, 0, 0.040, gripper);
   rbox(0.010, 0.050, 0.006, 0.0015, M.aluDark, 0, 0, 0.025, gripper);
-  for (const y of [-0.012, 0.012]) { const f = t3Cylinder(0.003, 0, 0.010, M.puBlue, 0, 0, gripper); f.rotation.y = Math.PI / 2; f.position.set(0.017, y, 0.045); }
+  for (const y of [-0.012, 0.012]) { const f = t3Cylinder(0.003, 0, 0.010, M.aluDark, 0, 0, gripper); f.rotation.y = Math.PI / 2; f.position.set(0.017, y, 0.045); }
   mergeT3Link(gripper);
-  const fingers = [-1, 1].map((sg) => { const f = rbox(0.012, 0.008, 0.030, 0.002, M.siliconeBlue, 0, sg * 0.022, 0.010, gripper); f.userData.sg = sg; return f; });
+  const jawShape = new THREE.Shape();
+  for (const [i, p] of [
+    [-0.009, -0.006], [-0.004, -0.006], [0, -0.002], [0.004, -0.006], [0.009, -0.006],
+    [0.009, 0.006], [0.004, 0.006], [0, 0.002], [-0.004, 0.006], [-0.009, 0.006],
+  ].entries()) (i ? jawShape.lineTo(...p) : jawShape.moveTo(...p));
+  jawShape.closePath();
+  const jawGeometry = new THREE.ExtrudeGeometry(jawShape, {
+    depth: 0.030, bevelEnabled: true, bevelThickness: 0.0005, bevelSize: 0.0004, bevelSegments: 1,
+  });
+  jawGeometry.translate(0, 0, -0.005); jawGeometry.clearGroups();
+  const fingers = new THREE.InstancedMesh(jawGeometry, M.siliconeBlue, 2);
+  fingers.name = "t3_v_jaws"; fingers.castShadow = fingers.receiveShadow = true; fingers.frustumCulled = false;
+  gripper.add(fingers);
+  const t3Hoses = [-1, 1].map((sg) => tubeAlong([V(0, 0, 0), V(0.1, 0, 0), V(0.2, 0, 0)], 0.002, M.puBlue, t3Group, 56, 8));
   const proc = { base: mergeT3Link(base), arm1: mergeT3Link(j1), arm2: mergeT3Link(j2), shaft: mergeT3Link(quill) };
-  return { sd, root, j1, j2, quill, gripper, fingers, proc };
+  const logo = labelPlane("EPSON", 0.070, 0.013, { bg: "#f5f5f1", fg: "#1246a0", px: 256 });
+  logo.name = "t3_epson_wordmark"; logo.position.set(0.065, 0, 0.416); j2.add(logo);
+  return { sd, root, j1, j2, quill, gripper, fingers, hoses: t3Hoses, proc };
 }
 const T3SD = { x: SCARA.x, y: SCARA.y, face: SCARA.face, name: SCARA.name, letter: "T3", i: 0 };
 const t3Models = [buildT3(T3SD)];
@@ -141,7 +175,23 @@ function setT3(m, q, grip) {
   m.j1.rotation.z = q[0]; m.j2.rotation.z = q[1];
   const k = t3FK(q); m.quill.position.set(k.j3[0], k.j3[1], q[2]); m.gripper.rotation.z = k.yaw;
   const half = lerp(0.020, PART.A.d / 2 + 0.004, grip);   // fingers close on the Ø20 housing body
-  m.fingers.forEach((f) => { f.position.y = f.userData.sg * half; });
+  const jaw = new THREE.Object3D();
+  [-1, 1].forEach((sg, i) => { jaw.position.set(0, sg * half, 0); jaw.updateMatrix(); m.fingers.setMatrixAt(i, jaw.matrix); });
+  m.fingers.instanceMatrix.needsUpdate = true;
+  m.root.updateWorldMatrix(true, true);
+  m.hoses.forEach((hose, i) => {
+    const sg = i ? 1 : -1;
+    const points = [
+      V(0.045, sg * 0.035, 0.420),
+      V(0.100, sg * 0.038, 0.431),
+      V(0.175, sg * 0.032, 0.431),
+      V(0.225, sg * 0.028, 0.425),
+    ].map((p) => m.j2.localToWorld(p));
+    points.push(m.quill.localToWorld(V(0.012, sg * 0.013, T3G.tool + 0.280)));
+    points.push(m.quill.localToWorld(V(0.012, sg * 0.013, T3G.tool + 0.100)));
+    points.push(m.gripper.localToWorld(V(0.018, sg * 0.014, 0.050)));
+    updateTube(hose, points.map((p) => t3Group.worldToLocal(p)));
+  });
 }
 function t3Check() {
   let maxMM = 0;
