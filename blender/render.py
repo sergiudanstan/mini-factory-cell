@@ -118,7 +118,9 @@ def render_plan(scene, root, manifest, args):
     chosen = [sg for sg in segs if lo <= sg['n'] <= hi]
     if not chosen: raise ValueError(f'No plan segments {lo}..{hi} in this export ({segs[0]["n"]}..{segs[-1]["n"]})')
     scene.render.resolution_percentage = args.percent or (100 if args.animation else 50)
-    scene.cycles.samples = args.samples or (64 if args.animation else 24)
+    # measured on the RTX 5050 (1080p, 32 samples, OptiX denoise): 7.5-10.5 s/frame after the first; 24 keeps the
+    # 2100-frame film near 3.5-4.5 h, 32 near 4.5-6 h
+    scene.cycles.samples = args.samples or 24
     jobs = []                                   # (frame, output path)
     if args.stills:
         out = args.out or root / 'previews'; out.mkdir(parents=True, exist_ok=True)

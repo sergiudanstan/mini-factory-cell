@@ -15,10 +15,10 @@ python3 blender/finish_film.py --input _cad/plan --from-seg 7 --to-seg 8      # 
 python3 blender/validate_video.py --input _cad/plan --video _cad/plan/mini_factory_cell_s07-08.mp4 --from-seg 7 --to-seg 8
 ```
 
-The film itself (only after release v1.0; about 3–4 h on the RTX 5050):
+The film itself (only after release v1.0). Measured at 1080p and 32 samples: 7.5–10.5 s per frame, so the 2100 frames (the 1914 film frames plus the dissolve overlaps) take about 4.5–6 h. The default of 24 samples brings that to about 3.5–4.5 h:
 
 ```sh
-$B -b _cad/plan/mini_factory_cell.blend --python blender/render.py -- --segments 1 14 --animation   # 1080p, 64 samples
+$B -b _cad/plan/mini_factory_cell.blend --python blender/render.py -- --segments 1 14 --animation   # 1080p, 24 samples (--samples 32 for cleaner glass)
 python3 blender/finish_film.py --input _cad/plan --out ~/Videos/mini-factory-cell/mini_factory_cell_cinematic.mp4
 python3 blender/validate_video.py --input _cad/plan --video ~/Videos/mini-factory-cell/mini_factory_cell_cinematic.mp4
 ```

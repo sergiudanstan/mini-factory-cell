@@ -288,6 +288,7 @@ def render_settings(scene):
     c.use_denoising = True; c.max_bounces = 6; c.diffuse_bounces = 3; c.glossy_bounces = 4
     c.transmission_bounces = 6; c.transparent_max_bounces = 16; c.caustics_reflective = False; c.caustics_refractive = False
     c.blur_glossy = 0.6; c.sample_clamp_indirect = 8.0; c.use_light_tree = True
+    c.use_adaptive_sampling = True; c.adaptive_threshold = 0.02          # the OptiX denoiser takes the rest
     scene.render.use_motion_blur = True; scene.render.motion_blur_shutter = 0.35; scene.render.motion_blur_position = 'CENTER'
     scene.render.use_persistent_data = True
 

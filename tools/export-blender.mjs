@@ -160,7 +160,8 @@ try {
     const response = await route.fetch(); let html = await response.text();
     const marker = "window.pcReady = true;";
     if (!html.includes(marker)) throw new Error("Missing pcReady hook; rebuild index.html first");
-    html = html.replace(marker, `(${bridge.toString()})();\n${marker}`);
+    // a bridge failure prints its whole stack (page errors are cut to 3 lines by the collector)
+    html = html.replace(marker, `try { (${bridge.toString()})(); } catch (e) { console.error("MFC_BRIDGE " + (e && e.stack || e)); throw e; }\n${marker}`);
     await route.fulfill({ response, body: html });
   });
   await openCell(p.page, session.url({ cad: !!flags.cad }), errors);
