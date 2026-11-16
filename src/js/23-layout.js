@@ -35,7 +35,7 @@ const LAYOUT = (() => {
   });
   // hopper positions outside the guard, chutes discharging over each bowl
   const guard = { x0: -1.35, x1: 1.35, y0: -1.10, y1: 1.45, top: floor + 2.0, gap: 0.15, post: 0.040, panelT: 0.006,
-                  postsX: [-1.35, -0.45, 0.45, 1.35], postsY: [-1.10, -0.20, 0.70, 1.45] };
+                  postsX: [-1.35, -0.45, 0.30, 1.35], postsY: [-1.10, -0.20, 0.85, 1.45] };   // 0.30 clears the back door, 0.85 the A and C chutes
   bowls[0].hopper.p = [guard.x0 - 0.38, bowls[0].cy, 0.46];
   bowls[1].hopper.p = [bowls[1].cx, guard.y1 + 0.38, 0.46];
   bowls[2].hopper.p = [guard.x1 + 0.38, bowls[2].cy, 0.46];
