@@ -45,8 +45,8 @@ const VIEW_DEFS = {
   delta:   { label: "Delta",    pos: [1.15, -0.65, 1.05], target: [0.0, 0.35, 0.45] },
   press:   { label: "Press",    pos: [0.66, -0.26, 0.44], target: [0.30, 0.0, 0.27] },
   vision:  { label: "Vision",   pos: [0.55, -0.58, 0.44], target: [0.21, -0.21, 0.25] },
-  scara:   { label: "SCARA",    pos: [-1.35, -1.30, 0.90], target: [-0.38, -0.40, 0.30] },
-  tray:    { label: "Tray",     pos: [-0.55, -1.20, 0.66], target: [-0.33, -0.60, 0.17] },
+  scara:   { label: "SCARA",    pos: [-1.18, -1.00, 0.98], target: [-0.42, -0.38, 0.30] },   // inside the guard corner, clear of the posts and the guard
+  tray:    { label: "Tray",     pos: [-0.62, -1.03, 0.60], target: [-0.33, -0.60, 0.17] },   // inside the guard, clear of the front panel
 };
 const views = Object.fromEntries(Object.entries(VIEW_DEFS).map(([k, v]) => [k, { label: v.label, pos: cv(...v.pos), target: cv(...v.target) }]));
 window.pcViews = views;
