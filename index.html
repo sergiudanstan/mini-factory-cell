@@ -2186,7 +2186,6 @@ const FRAME = (() => {
   const ST = LAYOUT.stack, FR = LAYOUT.frl, F = LAYOUT.floor;
   const zTop = G.top, zPanel0 = F + G.gap, zPanel1 = zTop - 0.04;
   const doorF = LAYOUT.doors.find((d) => d.side === "front"), doorB = LAYOUT.doors.find((d) => d.side === "back");
-  const backPost = G.postsX.find((x) => x > doorB.x0 && x < doorB.x1);
   const cur = LAYOUT.curtain;
   const guards = new THREE.Group(); guards.name = "guards"; root.add(guards);
 
@@ -2462,7 +2461,6 @@ const FRAME = (() => {
   pcPanelX(-1.33, -0.43, G.y1, zPanel0, zPanel1);
   pcPanelX(-0.43, -0.209, G.y1, zPanel0, zPanel1);
   pcPanelX(-0.049, doorB.x0, G.y1, zPanel0, zPanel1);
-  pcPanelX(doorB.x0, backPost - 0.02, G.y1, zPanel0, zPanel1);
   pcPanelX(-0.209, -0.049, G.y1, zPanel0, 0.258);
   pcPanelX(-0.209, -0.049, G.y1, 0.418, zPanel1);
   pcPanelX(doorB.x1, 1.33, G.y1, zPanel0, zPanel1);
@@ -2557,8 +2555,8 @@ const FRAME = (() => {
   const frontMid = (doorF.x0 + doorF.x1) / 2;
   doorLeafX(doorF.x0, frontMid, G.y0 - 0.04, -0.65, 1.13, -1, doorF.x0 + 0.04);
   doorLeafX(frontMid, doorF.x1, G.y0 - 0.04, -0.65, 1.13, -1, doorF.x1 - 0.04);
-  // back door: one leaf, hinged on the post that lies in the specified door span; fixed strip round it
-  const backLeaf0 = backPost + 0.02;
+  // back door: one leaf filling the door span, hinged at its left edge (no guard post inside the span)
+  const backLeaf0 = doorB.x0;
   doorLeafX(backLeaf0, doorB.x1, G.y1 + 0.04, -0.65, 1.13, 1, backLeaf0 + 0.04);
   // guard-locking interlocks: yellow handle on the door, black locking module on the adjacent frame
   boxAt(addG, M.estopYellow, 0.045, 0.035, 0.14, -0.52, G.y0 - 0.072, 0.34);
