@@ -5,9 +5,8 @@ const FRAME = (() => {
   const root = moduleRoot("frame");
   const B = LAYOUT.base, G = LAYOUT.guard, P = LAYOUT.portal, C = LAYOUT.cabinet, HM = LAYOUT.hmi;
   const ST = LAYOUT.stack, FR = LAYOUT.frl, F = LAYOUT.floor;
-  const zTop = G.top, zPanel0 = F + G.gap, zPanel1 = zTop - 0.04;
+  const zTop = G.top, postHalf = G.post / 2, zPanel0 = F + G.gap, zPanel1 = zTop - G.post;
   const doorF = LAYOUT.doors.find((d) => d.side === "front"), doorB = LAYOUT.doors.find((d) => d.side === "back");
-  const backPost = G.postsX.find((x) => x > doorB.x0 && x < doorB.x1);
   const cur = LAYOUT.curtain;
   const guards = new THREE.Group(); guards.name = "guards"; root.add(guards);
 
@@ -231,22 +230,25 @@ const FRAME = (() => {
       boltRoot(V3(x + 0.014, py + ny * 0.004, z - 0.014), V3(0, ny, 0));
     }
   }
-  // front/back top and bottom rails
-  for (const y of [G.y0, G.y1]) for (let i = 0; i < G.postsX.length - 1; i++) {
-    const x0 = G.postsX[i], x1 = G.postsX[i + 1];
-    for (const z of [zTop - 0.02, zPanel0 + 0.02]) {
-      profRoot(V3(x0, y, z), V3(x1, y, z));
-      guardBracket(x0, y, z, 0, y < 0 ? -1 : 1); guardBracket(x1, y, z, 0, y < 0 ? -1 : 1);
+  // top and bottom rails between the post faces, on every wall
+  function wallRails(axis, fixed, posts, out) {
+    const ps = posts.slice().sort((a, b) => a - b);
+    for (let i = 0; i < ps.length - 1; i++) {
+      const a = ps[i] + postHalf, b = ps[i + 1] - postHalf;
+      if (b <= a) continue;
+      for (const z of [G.top - postHalf, zPanel0 + postHalf]) {
+        if (axis === "x") profRoot(V3(a, fixed, z), V3(b, fixed, z));
+        else profRoot(V3(fixed, a, z), V3(fixed, b, z));
+        const nx = axis === "x" ? 0 : out, ny = axis === "x" ? out : 0;
+        guardBracket(ps[i], fixed, z, nx, ny);
+        guardBracket(ps[i + 1], fixed, z, nx, ny);
+      }
     }
   }
-  // side top and bottom rails
-  for (const x of [G.x0, G.x1]) for (let i = 0; i < G.postsY.length - 1; i++) {
-    const y0 = G.postsY[i], y1 = G.postsY[i + 1];
-    for (const z of [zTop - 0.02, zPanel0 + 0.02]) {
-      profRoot(V3(x, y0, z), V3(x, y1, z));
-      guardBracket(x, y0, z, x < 0 ? -1 : 1, 0); guardBracket(x, y1, z, x < 0 ? -1 : 1, 0);
-    }
-  }
+  wallRails("x", G.y0, G.postsX, -1);
+  wallRails("x", G.y1, G.postsX, 1);
+  wallRails("y", G.x0, G.postsY, -1);
+  wallRails("y", G.x1, G.postsY, 1);
 
   // ---------------------------------------------------------------- guard PC panels and seals
   function pcPanelX(x0, x1, y, z0, z1) {
@@ -272,36 +274,58 @@ const FRAME = (() => {
     boxAt(addG, sealMat, 0.012, 0.010, z1 - z0 - 0.012, xo, y1 - 0.005, (z0 + z1) / 2);
   }
 
-  // front wall: fixed strip beside the door + middle bay split around the light curtain + right bay
-  pcPanelX(-1.33, doorF.x0, G.y0, zPanel0, zPanel1);
-  pcPanelX(-0.43, cur.x0, G.y0, zPanel0, zPanel1);
-  pcPanelX(cur.x1, 0.43, G.y0, zPanel0, zPanel1);
-  pcPanelX(cur.x0, cur.x1, G.y0, zPanel0, cur.z0);
-  pcPanelX(cur.x0, cur.x1, G.y0, cur.z1, zPanel1);
-  pcPanelX(0.47, 1.33, G.y0, zPanel0, zPanel1);
-  // back wall: door occupies 0.35..1.05; split panels on either side
-  pcPanelX(-1.33, -0.43, G.y1, zPanel0, zPanel1);
-  pcPanelX(-0.43, -0.209, G.y1, zPanel0, zPanel1);
-  pcPanelX(-0.049, doorB.x0, G.y1, zPanel0, zPanel1);
-  pcPanelX(doorB.x0, backPost - 0.02, G.y1, zPanel0, zPanel1);
-  pcPanelX(-0.209, -0.049, G.y1, zPanel0, 0.258);
-  pcPanelX(-0.209, -0.049, G.y1, 0.418, zPanel1);
-  pcPanelX(doorB.x1, 1.33, G.y1, zPanel0, zPanel1);
-  // left wall: tray tunnel and bowl A chute opening
-  pcPanelY(-1.08, -0.749, G.x0, zPanel0, zPanel1);
-  pcPanelY(-0.449, -0.22, G.x0, zPanel0, zPanel1);
-  pcPanelY(-0.749, -0.449, G.x0, zPanel0, 0.10);
-  pcPanelY(-0.749, -0.449, G.x0, 0.30, zPanel1);
-  pcPanelY(-0.20, 0.569, G.x0, zPanel0, zPanel1);
-  pcPanelY(0.569, 0.729, G.x0, zPanel0, 0.258);
-  pcPanelY(0.569, 0.729, G.x0, 0.418, zPanel1);
-  pcPanelY(0.729, 1.43, G.x0, zPanel0, zPanel1);
-  // right wall: bowl C chute opening
-  pcPanelY(-1.08, -0.20, G.x1, zPanel0, zPanel1);
-  pcPanelY(-0.20, 0.582, G.x1, zPanel0, zPanel1);
-  pcPanelY(0.582, 0.729, G.x1, zPanel0, 0.258);
-  pcPanelY(0.582, 0.729, G.x1, 0.418, zPanel1);
-  pcPanelY(0.729, 1.43, G.x1, zPanel0, zPanel1);
+  // Everything below is generated from the layout: bays are bounded by the post faces, and every
+  // door / curtain / tunnel / chute void is subtracted from the PC panel rectangles in its bay.
+  const wallDefs = [
+    { side: "front", axis: "x", fixed: G.y0, posts: G.postsX },
+    { side: "back", axis: "x", fixed: G.y1, posts: G.postsX },
+    { side: "left", axis: "y", fixed: G.x0, posts: G.postsY },
+    { side: "right", axis: "y", fixed: G.x1, posts: G.postsY },
+  ];
+  const wallOpenings = [];
+  for (const d of LAYOUT.doors) wallOpenings.push({ side: d.side, u0: Math.min(d.x0, d.x1), u1: Math.max(d.x0, d.x1), z0: zPanel0, z1: zPanel1 });
+  wallOpenings.push({ side: cur.side, u0: Math.min(cur.x0, cur.x1), u1: Math.max(cur.x0, cur.x1), z0: cur.z0, z1: cur.z1 });
+  for (const o of LAYOUT.openings) {
+    const u = o.along != null ? o.along : o.y;
+    wallOpenings.push({ side: o.side, u0: u - o.w / 2, u1: u + o.w / 2, z0: o.z0, z1: o.z1 });
+  }
+  function buildWallPanels(wall) {
+    const ps = wall.posts.slice().sort((a, b) => a - b);
+    for (let i = 0; i < ps.length - 1; i++) {
+      const bay0 = ps[i] + postHalf, bay1 = ps[i + 1] - postHalf;
+      if (bay1 <= bay0 + 1e-6) continue;
+      const cuts = new Set([bay0, bay1]);
+      for (const o of wallOpenings) {
+        if (o.side !== wall.side) continue;
+        const a = Math.max(o.u0, bay0), b = Math.min(o.u1, bay1);
+        if (b > a + 1e-6) { cuts.add(a); cuts.add(b); }
+      }
+      const cs = [...cuts].sort((a, b) => a - b);
+      for (let j = 0; j < cs.length - 1; j++) {
+        const a = cs[j], b = cs[j + 1];
+        if (b - a < 1e-6) continue;
+        const mid = (a + b) / 2;
+        const voids = wallOpenings
+          .filter((o) => o.side === wall.side && mid > o.u0 && mid < o.u1)
+          .map((o) => [Math.max(o.z0, zPanel0), Math.min(o.z1, zPanel1)])
+          .filter(([v0, v1]) => v1 > v0 + 1e-6)
+          .sort((x, y) => x[0] - y[0]);
+        let z = zPanel0;
+        const ranges = [];
+        for (const [v0, v1] of voids) {
+          if (v0 > z + 1e-6) ranges.push([z, Math.min(v0, zPanel1)]);
+          z = Math.max(z, v1);
+        }
+        if (z < zPanel1 - 1e-6) ranges.push([z, zPanel1]);
+        for (const [r0, r1] of ranges) {
+          if (r1 - r0 < 1e-4) continue;
+          if (wall.axis === "x") pcPanelX(a, b, wall.fixed, r0, r1);
+          else pcPanelY(a, b, wall.fixed, r0, r1);
+        }
+      }
+    }
+  }
+  wallDefs.forEach(buildWallPanels);
 
   // ---------------------------------------------------------------- guard openings: tray tunnel and hopper chutes
   function collarX(x, yc, w, z0, z1, dir) {
@@ -344,12 +368,12 @@ const FRAME = (() => {
 
   // ---------------------------------------------------------------- doors: front double door and back single door
   function doorLeafX(x0, x1, yLeaf, z0, z1, out, hingeAt) {
-    const xL = x0 + 0.02, xR = x1 - 0.02, zB = z0 + 0.02, zT = z1 - 0.02;
+    const xL = x0 + postHalf, xR = x1 - postHalf, zB = z0 + postHalf, zT = z1 - postHalf;
     profGuard(V3(xL, yLeaf, z0), V3(xL, yLeaf, z1));
     profGuard(V3(xR, yLeaf, z0), V3(xR, yLeaf, z1));
-    profGuard(V3(xL + 0.02, yLeaf, zB), V3(xR - 0.02, yLeaf, zB));
-    profGuard(V3(xL + 0.02, yLeaf, zT), V3(xR - 0.02, yLeaf, zT));
-    const pw = (xR - 0.02) - (xL + 0.02), ph = (zT - 0.02) - (zB + 0.02);
+    profGuard(V3(xL + postHalf, yLeaf, zB), V3(xR - postHalf, yLeaf, zB));
+    profGuard(V3(xL + postHalf, yLeaf, zT), V3(xR - postHalf, yLeaf, zT));
+    const pw = (xR - postHalf) - (xL + postHalf), ph = (zT - postHalf) - (zB + postHalf);
     const cx = (xL + xR) / 2, cz = (zB + zT) / 2;
     boxAt(addG, pcMat, pw, 0.006, ph, cx, yLeaf, cz);
     // leaf seals
@@ -376,25 +400,26 @@ const FRAME = (() => {
   }
   // front double door: two equal leaves, hinges outboard, leaves mounted on the outside face
   const frontMid = (doorF.x0 + doorF.x1) / 2;
-  doorLeafX(doorF.x0, frontMid, G.y0 - 0.04, -0.65, 1.13, -1, doorF.x0 + 0.04);
-  doorLeafX(frontMid, doorF.x1, G.y0 - 0.04, -0.65, 1.13, -1, doorF.x1 - 0.04);
-  // back door: one leaf, hinged on the post that lies in the specified door span; fixed strip round it
-  const backLeaf0 = backPost + 0.02;
-  doorLeafX(backLeaf0, doorB.x1, G.y1 + 0.04, -0.65, 1.13, 1, backLeaf0 + 0.04);
+  doorLeafX(doorF.x0, frontMid, G.y0 - G.post, zPanel0, zPanel1, -1, doorF.x0 + G.post);
+  doorLeafX(frontMid, doorF.x1, G.y0 - G.post, zPanel0, zPanel1, -1, doorF.x1 - G.post);
+  // back door: one full-width leaf in the clear bay
+  doorLeafX(doorB.x0, doorB.x1, G.y1 + G.post, zPanel0, zPanel1, 1, doorB.x0 + G.post);
   // guard-locking interlocks: yellow handle on the door, black locking module on the adjacent frame
-  boxAt(addG, M.estopYellow, 0.045, 0.035, 0.14, -0.52, G.y0 - 0.072, 0.34);
-  boxAt(addG, M.blackPlastic, 0.024, 0.045, 0.05, -0.52, G.y0 - 0.092, 0.38);
-  boxAt(addG, M.blackPlastic, 0.028, 0.050, 0.16, -0.427, G.y0 - 0.072, 0.34);
-  boxAt(addG, ledRedMat, 0.006, 0.004, 0.008, -0.427, G.y0 - 0.098, 0.40);
-  boxAt(addG, M.estopYellow, 0.045, 0.035, 0.14, 0.99, G.y1 + 0.072, 0.34);
-  boxAt(addG, M.blackPlastic, 0.024, 0.045, 0.05, 0.99, G.y1 + 0.092, 0.38);
-  boxAt(addG, M.blackPlastic, 0.028, 0.050, 0.16, 1.075, G.y1 + 0.052, 0.34);
-  boxAt(addG, ledRedMat, 0.006, 0.004, 0.008, 1.075, G.y1 + 0.078, 0.40);
-  boxAt(addG, M.zinc9006, 0.04, 0.05, 0.06, -0.44, G.y0 - 0.045, 0.34);
-  boxAt(addG, M.zinc9006, 0.04, 0.05, 0.06, 1.065, G.y1 + 0.025, 0.34);
+  const frontLockX = doorF.x1 - G.post;
+  const backLockX = doorB.x1 - G.post;
+  boxAt(addG, M.estopYellow, 0.045, 0.035, 0.14, frontLockX, G.y0 - G.post - 0.032, 0.34);
+  boxAt(addG, M.blackPlastic, 0.024, 0.045, 0.05, frontLockX, G.y0 - G.post - 0.052, 0.38);
+  boxAt(addG, M.blackPlastic, 0.028, 0.050, 0.16, doorF.x1 + postHalf, G.y0 - G.post - 0.032, 0.34);
+  boxAt(addG, ledRedMat, 0.006, 0.004, 0.008, doorF.x1 + postHalf, G.y0 - G.post - 0.058, 0.40);
+  boxAt(addG, M.estopYellow, 0.045, 0.035, 0.14, backLockX, G.y1 + G.post + 0.032, 0.34);
+  boxAt(addG, M.blackPlastic, 0.024, 0.045, 0.05, backLockX, G.y1 + G.post + 0.052, 0.38);
+  boxAt(addG, M.blackPlastic, 0.028, 0.050, 0.16, doorB.x1 + postHalf, G.y1 + G.post + 0.032, 0.34);
+  boxAt(addG, ledRedMat, 0.006, 0.004, 0.008, doorB.x1 + postHalf, G.y1 + G.post + 0.058, 0.40);
+  boxAt(addG, M.zinc9006, 0.04, 0.05, 0.06, doorF.x1 + postHalf / 2, G.y0 - G.post - 0.005, 0.34);
+  boxAt(addG, M.zinc9006, 0.04, 0.05, 0.06, doorB.x1 + postHalf, G.y1 + G.post - 0.015, 0.34);
 
   // ---------------------------------------------------------------- light curtain, reset, shelf and sign
-  const curH = cur.z1 - cur.z0, curZc = (cur.z0 + cur.z1) / 2;
+  const curH = cur.z1 - cur.z0, curZc = (cur.z0 + cur.z1) / 2, curCx = (cur.x0 + cur.x1) / 2;
   for (const sx of [-1, 1]) {
     const x = sx < 0 ? cur.x0 - 0.025 : cur.x1 + 0.025;
     boxAt(addG, M.ral1023, 0.036, 0.045, curH + 0.05, x, G.y0 - 0.035, curZc);
@@ -406,14 +431,14 @@ const FRAME = (() => {
     cylAt(addG, sx > 0 ? ledGreenMat : ledRedMat, 0.005, 0.010, x, G.y0 - 0.060, cur.z1 + 0.04, "y", 10);
   }
   // shelf in front of the reject bin
-  boxAt(addG, M.stainlessBrushed, 0.48, 0.20, 0.012, 0, G.y0 - 0.18, -0.12);
-  boxAt(addG, M.blackRubber, 0.43, 0.15, 0.002, 0, G.y0 - 0.18, -0.112);
-  boxAt(addG, M.stainlessBrushed, 0.48, 0.012, 0.032, 0, G.y0 - 0.285, -0.102);
+  boxAt(addG, M.stainlessBrushed, 0.48, 0.20, 0.012, curCx, G.y0 - 0.18, -0.12);
+  boxAt(addG, M.blackRubber, 0.43, 0.15, 0.002, curCx, G.y0 - 0.18, -0.112);
+  boxAt(addG, M.stainlessBrushed, 0.48, 0.012, 0.032, curCx, G.y0 - 0.285, -0.102);
   for (const sx of [-1, 1]) {
-    boxAt(addG, M.zinc9006, 0.025, 0.18, 0.050, sx * 0.18, G.y0 - 0.19, -0.155);
-    boxAt(addG, M.zinc9006, 0.025, 0.025, 0.13, sx * 0.18, G.y0 - 0.115, -0.215);
-    boxAt(addG, M.zinc9006, 0.025, 0.025, 0.52, sx * 0.18, G.y0 - 0.155, -0.39);
-    boxAt(addG, M.zinc9006, 0.06, 0.06, 0.010, sx * 0.18, G.y0 - 0.155, -0.655);
+    boxAt(addG, M.zinc9006, 0.025, 0.18, 0.050, curCx + sx * 0.18, G.y0 - 0.19, -0.155);
+    boxAt(addG, M.zinc9006, 0.025, 0.025, 0.13, curCx + sx * 0.18, G.y0 - 0.115, -0.215);
+    boxAt(addG, M.zinc9006, 0.025, 0.025, 0.52, curCx + sx * 0.18, G.y0 - 0.155, -0.39);
+    boxAt(addG, M.zinc9006, 0.06, 0.06, 0.010, curCx + sx * 0.18, G.y0 - 0.155, -0.655);
   }
   // blue reset button on a small bracket beside the curtain
   boxAt(addG, M.ral7035, 0.08, 0.05, 0.12, cur.x1 + 0.12, G.y0 - 0.035, cur.z1 + 0.05);
@@ -423,12 +448,14 @@ const FRAME = (() => {
   signMesh(0.30, 0.11, (g, w, h) => {
     g.fillStyle = "#e6b000"; g.fillRect(0, 0, w, h);
     g.strokeStyle = "#16181a"; g.lineWidth = 8; g.strokeRect(4, 4, w - 8, h - 8);
-    g.fillStyle = "#16181a"; g.fillRect(20, 30, 16, 76); g.fillRect(36, 30, 46, 10); g.fillRect(36, 96, 46, 10);
-    g.font = "700 44px 'IBM Plex Sans', Arial, sans-serif"; g.fillText("SAFETY LIGHT", 104, 58);
-    g.fillText("CURTAIN", 104, 114);
-    g.fillStyle = "#16181a"; g.fillRect(400, 30, 82, 82);
-    g.fillStyle = "#e6b000"; g.fillRect(410, 40, 10, 62); g.fillRect(430, 52, 10, 50); g.fillRect(450, 40, 10, 62);
-  }, guards, 0, G.y0 - 0.006, cur.z1 + 0.11, 0, -1, 0, "frame_sign_light_curtain");
+    // light-curtain pictogram: two posts with three horizontal beams, clear of the text block
+    g.fillStyle = "#16181a";
+    g.fillRect(22, 28, 12, 88); g.fillRect(78, 28, 12, 88);
+    for (let i = 0; i < 3; i++) g.fillRect(40, 46 + i * 22, 32, 6);
+    g.font = "700 38px 'IBM Plex Sans', Arial, sans-serif"; g.textAlign = "left"; g.textBaseline = "alphabetic";
+    g.fillText("SAFETY LIGHT", 110, 62);
+    g.fillText("CURTAIN", 110, 112);
+  }, guards, curCx, G.y0 - 0.006, cur.z1 + 0.11, 0, -1, 0, "frame_sign_light_curtain");
 
   // ---------------------------------------------------------------- delta portal: four posts, beams, plate, knee braces
   const portalPlateY = P.plate.y, portalPlateZ0 = P.plate.z0, portalPlateZ1 = P.plate.z1;
@@ -531,8 +558,9 @@ const FRAME = (() => {
     latheAt(addR, M.blackPlastic, [[0, 0], [0.030, 0], [0.031, 0.004], [0.031, 0.012], [0, 0.012]], x + nx * 0.012, y + ny * 0.012, z, 24, n, "frame_estop_collars");
     latheAt(addR, M.estopRed, [[0, 0], [0.035, 0], [0.037, 0.005], [0.033, 0.015], [0.021, 0.022], [0, 0.024]], x + nx * 0.018, y + ny * 0.018, z, 24, n, "frame_estops");
   }
-  eStop(doorF.x1 + 0.005, G.y0 - 0.024, 0.55, 0, -1);
-  eStop(G.x1 - 0.005, G.y1 + 0.024, 0.55, 0, 1);
+  eStop(doorF.x1, G.y0 - postHalf - 0.004, 0.55, 0, -1);
+  const backEStopX = G.postsX.reduce((best, x) => (Math.abs(x - doorB.x0) < Math.abs(best - doorB.x0) ? x : best), G.postsX[0]);
+  eStop(backEStopX, G.y1 + postHalf + 0.004, 0.55, 0, 1);
   eStop(2.06, C.y - C.d / 2 - 0.007, 0.92, 0, -1);
 
   // ---------------------------------------------------------------- electrical cabinet (Rittal TS8 style)
