@@ -1,103 +1,70 @@
 #!/usr/bin/env python3
-"""Deterministic factory sound from exported logic segments; CPU encode only.
+"""Finish the Blender film with the browser film's own pipeline: tools/film.mjs --frames-from.
 
-python blender/finish_film.py --input _cad/blender --audio-only
-python blender/finish_film.py --input _cad/blender --frames-dir _cad/blender/frames
-Requires numpy and ffmpeg; no Blender process is launched.
+Both films share one choreography (film/plan.json), so the Blender frames get exactly what the browser film gets:
+the plan's dissolves and cuts, the title, chapter lower-thirds, the S4 force-travel inset and the end card, and the
+procedural soundtrack of tools/audio.mjs (machine events mapped through the same segments, slow motion included).
+Encode: x264 CRF 17 yuv420p with BT.709 limited-range tags, AAC 48 kHz stereo; then ffprobe, a full decode and a
+contact sheet (tools/film.mjs), see also blender/validate_video.py.
+
+  python3 blender/finish_film.py --input _cad/plan                       # the whole film
+  python3 blender/finish_film.py --input _cad/plan --from-seg 7 --to-seg 8   # a test of two segments
+Frames come from <input>/frames/sNN/f_00000.png ... (blender/render.py --segments A B). Needs node, ffmpeg and
+Chrome (overlays; the shared Chrome lock is respected). No Blender process is launched.
 """
 import argparse
+import hashlib
 import json
-import math
 from pathlib import Path
+import struct
 import subprocess
-import wave
+import sys
 
-import numpy as np
-
-RATE = 48000
+REPO = Path(__file__).resolve().parents[1]
 
 
-def synthesize(meta):
-    duration = meta['frames'] / meta['fps']
-    count = round(duration * RATE)
-    rng = np.random.default_rng(450125)
-    t = np.arange(count) / RATE
-    mix = np.zeros((count, 2), dtype=np.float64)
-
-    def add(signal, start=0., pan=0.):
-        offset = round(start * RATE)
-        lo, hi = max(0, offset), min(count, offset + len(signal))
-        if hi <= lo: return
-        signal = signal[lo - offset:hi - offset]
-        mix[lo:hi, 0] += signal * math.sqrt((1 - pan) / 2)
-        mix[lo:hi, 1] += signal * math.sqrt((1 + pan) / 2)
-
-    # The bowls are 100 Hz electromagnetic drives; small differences avoid a mono drone.
-    for i, pan in enumerate((-.6, 0., .6)):
-        hum = sum(.012 / h * np.sin(2 * np.pi * (100 + i * .12) * h * t + i) for h in range(1, 5))
-        add(hum * (1 + .08 * np.sin(2 * np.pi * .4 * t)), pan=pan)
-    add(rng.standard_normal(count) * .002)
-    cues = []
-    for actor, segments in meta['events'].items():
-        for segment in segments:
-            start, end = float(segment['t0']), float(segment['t1'])
-            kind = segment.get('kind', '')
-            if end <= 0 or start >= duration or kind in ('wait', 'idle', 'hold'): continue
-            span = min(end - start, duration - start)
-            if span <= 0: continue
-            n = max(1, math.ceil(span * RATE)); u = np.arange(n) / RATE
-            envelope = np.minimum(u / .012, 1) * np.minimum(np.maximum(span - u, 0) / .025, 1)
-            pan = -.3 if actor == 'scara' else .25 if actor == 'press' else 0
-            if actor == 'dial' and kind == 'index':
-                signal = .045 * np.exp(-u * 20) * (np.sin(2 * np.pi * 170 * u) + .3 * rng.standard_normal(n))
-                signal += .018 * np.sin(2 * np.pi * (180 * u + 300 * u * u)) * envelope
-            elif actor in ('delta', 'scara'):
-                if 'close' in kind or 'open' in kind or 'grip' in kind:
-                    signal = .025 * rng.standard_normal(n) * np.exp(-u * 22)
-                else:
-                    signal = .012 * np.sin(2 * np.pi * (360 * u + 180 * u * u / max(span, .01))) * envelope
-            elif actor in ('press', 'reject') or actor.startswith('feed'):
-                signal = .014 * rng.standard_normal(n) * envelope + .016 * np.sin(2 * np.pi * 240 * u) * np.exp(-u * 26)
-            elif actor == 'tray':
-                signal = .018 * np.sin(2 * np.pi * (180 * u + 25 * u * u)) * envelope
-            else: continue
-            add(signal, start, pan); cues.append({'actor': actor, 'kind': kind, 't0': start, 't1': end})
-    mix *= (np.minimum(t / .35, 1) * np.clip((duration - t) / .7, 0, 1))[:, None]
-    peak = float(np.max(np.abs(mix)))
-    mix *= 10 ** (-3 / 20) / max(peak, 1e-12)
-    if not np.isfinite(mix).all(): raise ValueError('Nonfinite audio')
-    pcm = np.rint(mix * 32767).astype('<i2')
-    return pcm, {'duration': duration, 'sampleRate': RATE, 'channels': 2, 'samples': count,
-                 'peakDbFS': -3., 'seed': 450125, 'cues': cues}
+def png_size(path):
+    with open(path, 'rb') as stream:
+        head = stream.read(24)
+    if head[:8] != b'\x89PNG\r\n\x1a\n' or head[12:16] != b'IHDR':
+        raise ValueError(f'{path}: not a PNG')
+    return struct.unpack('>II', head[16:24])
 
 
 def main():
-    p = argparse.ArgumentParser()
-    p.add_argument('--input', type=Path, default=Path('_cad/blender'))
-    p.add_argument('--audio-only', action='store_true')
-    p.add_argument('--frames-dir', type=Path)
-    p.add_argument('--out', type=Path)
-    args = p.parse_args(); root = args.input.resolve()
+    p = argparse.ArgumentParser(description='Finish the Blender film through tools/film.mjs --frames-from')
+    p.add_argument('--input', type=Path, default=Path('_cad/plan'), help='plan export directory (manifest.json)')
+    p.add_argument('--frames-dir', type=Path, help='default <input>/frames')
+    p.add_argument('--from-seg', type=int); p.add_argument('--to-seg', type=int)
+    p.add_argument('--out', type=Path, help='default <input>/mini_factory_cell[_sAA-BB].mp4')
+    p.add_argument('--port', type=int, default=8788)
+    p.add_argument('--no-overlays', action='store_true'); p.add_argument('--no-audio', action='store_true')
+    args = p.parse_args()
+    root = args.input.resolve()
     meta = json.loads((root / 'manifest.json').read_text())
-    pcm, report = synthesize(meta)
-    wav = root / 'machine_sound.wav'
-    with wave.open(str(wav), 'wb') as output:
-        output.setnchannels(2); output.setsampwidth(2); output.setframerate(RATE); output.writeframes(pcm.tobytes())
-    (root / 'audio-report.json').write_text(json.dumps(report, indent=2) + '\n')
-    print(f'Audio: {wav}; {len(pcm)} stereo samples, {len(report["cues"])} logic cues')
-    if args.audio_only: return
+    tl = meta.get('timeline') or {}
+    if tl.get('mode') != 'plan':
+        sys.exit('finish_film.py needs a plan export (tools/export-blender.mjs without --linear)')
+    segs = tl['segments']
+    lo = args.from_seg or segs[0]['n']; hi = args.to_seg or segs[-1]['n']
+    if not any(s['n'] == lo for s in segs) or not any(s['n'] == hi for s in segs) or lo > hi:
+        sys.exit(f'segments {lo}..{hi} are not in this export ({segs[0]["n"]}..{segs[-1]["n"]})')
+    plan = Path(tl['plan'])
+    current = hashlib.sha256(plan.read_bytes()).hexdigest()[:16]
+    if current != tl.get('planHash'):
+        print(f'warning: {plan} changed since the export (hash {current} != {tl.get("planHash")}); '
+              'segment lengths are checked frame by frame, captions follow the current plan', flush=True)
     frames = (args.frames_dir or root / 'frames').resolve()
-    from validate_video import validate_frames
-    errors = validate_frames(frames, meta['frames'], (1920, 1080))
-    if errors: raise ValueError('\n'.join(errors[:10]))
-    movie = (args.out or root / 'mini_factory_cell.mp4').resolve(); movie.parent.mkdir(parents=True, exist_ok=True)
-    duration = meta['frames'] / meta['fps']
-    subprocess.run(['ffmpeg', '-y', '-v', 'warning', '-framerate', str(meta['fps']), '-start_number', '1',
-                    '-i', str(frames / 'frame_%04d.png'), '-i', str(wav), '-map', '0:v:0', '-map', '1:a:0',
-                    '-c:v', 'libx264', '-crf', '17', '-preset', 'slow', '-pix_fmt', 'yuv420p',
-                    '-c:a', 'aac', '-b:a', '192k', '-ar', str(RATE), '-t', str(duration),
-                    '-movflags', '+faststart', str(movie)], check=True)
-    print('Encoded', movie)
+    width, height = png_size(frames / f's{lo:02d}' / 'f_00000.png')
+    full = (lo, hi) == (segs[0]['n'], segs[-1]['n'])
+    out = (args.out or root / ('mini_factory_cell.mp4' if full else f'mini_factory_cell_s{lo:02d}-{hi:02d}.mp4')).resolve()
+    cmd = ['node', str(REPO / 'tools/film.mjs'), '--plan', str(plan), '--frames-from', str(frames),
+           '--from-seg', str(lo), '--to-seg', str(hi), '--size', f'{width}x{height}', '--out', str(out), '--port', str(args.port)]
+    if args.no_overlays: cmd.append('--no-overlays')
+    if args.no_audio: cmd.append('--no-audio')
+    print('FINISH', ' '.join(cmd), flush=True)
+    sys.exit(subprocess.call(cmd, cwd=REPO))
 
 
-if __name__ == '__main__': main()
+if __name__ == '__main__':
+    main()
