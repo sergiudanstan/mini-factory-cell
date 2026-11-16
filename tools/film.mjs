@@ -7,7 +7,9 @@
 //
 // Usage: node tools/film.mjs [--plan film/plan.json] [--out _frames/film.mp4] [--preview] [--from-seg A] [--to-seg B]
 //          [--size WxH] [--fps N] [--frames-only] [--keep-frames] [--resume] [--audio FILE.wav | --no-audio]
-//          [--no-overlays] [--check] [--cad] [--root DIR] [--port N] [--gpu MODE]
+//          [--no-overlays] [--check] [--frames-from DIR] [--cad] [--root DIR] [--port N] [--gpu MODE]
+//   --frames-from DIR  finish frames rendered elsewhere (the Blender film): DIR/sNN/f_00000.png|jpg per segment, as
+//               tools/film.mjs itself writes them; overlays, audio, dissolves, validation and contact sheet as usual
 //   --check     validate the plan, print the cut list and camera warnings, no Chrome
 //   --preview   half size, every 3rd frame (10 fps), fast x264: a quick look at the whole plan
 import { execFileSync, spawn, spawnSync } from "node:child_process";
@@ -32,6 +34,7 @@ const flags = parseFlags({
   "no-audio": { type: "bool", help: "silent film" },
   "no-overlays": { type: "bool", help: "no titles, captions, insets or end card" },
   check: { type: "bool", help: "validate the plan and print the cut list, then exit" },
+  "frames-from": { type: "string", help: "use frames rendered elsewhere: DIR/sNN/f_%05d.png|jpg (e.g. the Blender render)" },
   hq: { type: "onoff", default: true, help: "HQ rendering", shown: " (default on)" },
   cad: { type: "bool", help: "load the CAD robots (default adds ?cad=0)" },
   quality: { type: "int", default: 93, help: "JPEG quality of the frames (85 with --preview)" },
@@ -220,10 +223,10 @@ function run(cmd, args, { quiet = false } = {}) {
   });
 }
 
-function encodeArgs(P, frameDir, overlays, audio, out) {
+function encodeArgs(P, frameDir, overlays, audio, out, ext = "jpg") {
   const args = ["-y", "-hide_banner", "-loglevel", "error", process.stderr.isTTY ? "-stats" : "-nostats"];
   const fc = [];
-  P.jobs.forEach((j) => args.push("-framerate", String(P.rfps), "-start_number", "0", "-i", join(frameDir, j.dir, "f_%05d.jpg")));
+  P.jobs.forEach((j) => args.push("-framerate", String(P.rfps), "-start_number", "0", "-i", join(frameDir, j.dir, `f_%05d.${ext}`)));
   // segments: JPEG (full-range BT.601) -> planar RGB; dissolves with xfade, cuts with concat
   P.jobs.forEach((j, k) => fc.push(`[${k}:v]format=gbrp,setsar=1,settb=1/${P.rfps}[v${k}]`));
   let cur = "v0";
@@ -327,6 +330,25 @@ async function contactSheet(out, P, sheet) {
   return sheet;
 }
 
+// External frames (--frames-from): every segment folder must hold exactly its frame count, all of the film size.
+function checkExternalFrames(P, dir) {
+  let ext = null;
+  for (const j of P.jobs) {
+    const d = join(dir, j.dir);
+    if (!existsSync(d)) throw new Error(`--frames-from: missing ${d} (segment ${j.seg.n} "${j.seg.label}")`);
+    const files = readdirSync(d).filter((f) => /^f_\d{5}\.(png|jpg)$/.test(f)).sort();
+    const e = files.length ? files[0].slice(-3) : null;
+    if (!e) throw new Error(`--frames-from: no f_00000.png|jpg in ${d}`);
+    if (ext && e !== ext) throw new Error(`--frames-from: mixed frame types (${ext} and ${e})`);
+    ext = e;
+    if (files.length !== j.n || files.at(-1) !== `f_${pad(j.n - 1, 5)}.${e}`) throw new Error(`--frames-from: ${d} has ${files.length} frames, segment ${j.seg.n} needs f_00000..f_${pad(j.n - 1, 5)}.${e}`);
+  }
+  const first = join(dir, P.jobs[0].dir, `f_00000.${ext}`);
+  const v = JSON.parse(execFileSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "json", first], { encoding: "utf8" })).streams[0];
+  if (v.width !== P.size.width || v.height !== P.size.height) throw new Error(`--frames-from: frames are ${v.width}x${v.height}, the film is ${P.size.width}x${P.size.height} (pass --size ${v.width}x${v.height})`);
+  return ext;
+}
+
 // ---------------------------------------------------------------- main
 let session = null;
 try {
@@ -347,13 +369,20 @@ try {
   const t0 = Date.now();
 
   // 1. Chrome: overlays and frames (one session, the shared lock is held only while Chrome runs)
-  session = await startSession(flags, P.size);
+  const external = flags.framesFrom ? resolve(flags.framesFrom) : null;
+  let ext = "jpg", fr = { hooks: [], renderS: 0, rendered: 0, skipped: 0 };
+  if (external) ext = checkExternalFrames(P, external);
   const specs = flags.noOverlays ? [] : overlaySpecs(P, L);
-  const overlays = await renderOverlays(session, P, specs, ovDir);
-  const fr = await renderFrames(session, P, frameDir);
-  await session.close();
-  session = null;
-  console.log(`frames: ${fr.rendered} rendered${fr.skipped ? `, ${fr.skipped} kept` : ""} in ${fmtDur(fr.renderS)}`);
+  let overlays = [];
+  if (specs.length || !external) {
+    session = await startSession(flags, P.size);
+    overlays = await renderOverlays(session, P, specs, ovDir);
+    if (!external) fr = await renderFrames(session, P, frameDir);
+    await session.close();
+    session = null;
+  }
+  if (external) console.log(`frames: ${P.jobs.reduce((n, j) => n + j.n, 0)} ${ext.toUpperCase()} frames from ${external}`);
+  else console.log(`frames: ${fr.rendered} rendered${fr.skipped ? `, ${fr.skipped} kept` : ""} in ${fmtDur(fr.renderS)}`);
   if (flags.framesOnly) {
     console.log(`frames in ${frameDir}${overlays.length ? `, overlays in ${ovDir}` : ""}`);
     process.exit(0);
@@ -376,7 +405,7 @@ try {
   mkdirSync(dirname(out), { recursive: true });
   const e0 = Date.now();
   console.log(`encoding ${P.total} frames (${P.dur.toFixed(2)} s) -> ${out}`);
-  await run("ffmpeg", encodeArgs(P, frameDir, overlays, audio, out));
+  await run("ffmpeg", encodeArgs(P, external || frameDir, overlays, audio, out, ext));
   console.log(`encoded in ${fmtDur((Date.now() - e0) / 1000)}`);
 
   // 4. validation and contact sheet
@@ -396,7 +425,8 @@ try {
   for (const h of fr.hooks) console.warn(`page hook needed: ${h}`);
   if (!val.ok) { for (const p of val.problems) console.error(`validation: ${p}`); process.exitCode = 1; }
   else console.log(`validation: PASS (${fmtDur(report.wallS)} wall)`);
-  if (!flags.keepFrames) rmSync(frameDir, { recursive: true, force: true });
+  if (external) { /* never delete frames rendered elsewhere */ }
+  else if (!flags.keepFrames) rmSync(frameDir, { recursive: true, force: true });
   else console.log(`frames kept in ${frameDir}`);
 } catch (e) {
   reportFatal(e);

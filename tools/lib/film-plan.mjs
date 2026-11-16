@@ -16,6 +16,7 @@
 //       "caption": { "style": "title|chapter|end", "n": "02", "text": "...", "sub": "...", "in": a, "out": b },
 //       "inset": { "kind": "press-curve", "in": a, "out": b },                        optional data graphic
 //       "audio": { "gain": 1 }                      optional per-segment event gain
+//       "blender": { "fstop": 4, "blur": true }      optional Blender-only shot settings (depth of field f-stop, motion blur)
 //     } ] }
 // Keys: 1 key = static; 2 keys = smoothstep between them (or the segment ease); 3+ keys = centripetal Catmull-Rom through
 // the keys, passing key i at its u (timing is a monotone cubic through the keys' arc lengths, so the speed is smooth).
@@ -169,7 +170,7 @@ export function preparePlan(raw) {
   if (!Number.isInteger(fps) || fps < 1 || fps > 120) throw new Error(`plan.fps ${fps}: use an integer 1..120`);
   if (!Array.isArray(size) || size.length !== 2 || !size.every((v) => Number.isInteger(v) && v >= 64)) throw new Error("plan.size must be [width, height]");
   if (!Array.isArray(raw.segments) || !raw.segments.length) throw new Error("plan.segments must be a non-empty list");
-  const KNOWN = ["label", "dur", "sim", "xfade", "ease", "cam", "orbit", "caption", "inset", "audio", "note", "poster"];
+  const KNOWN = ["label", "dur", "sim", "xfade", "ease", "cam", "orbit", "caption", "inset", "audio", "note", "poster", "blender"];
   let T = 0;
   const segments = raw.segments.map((s, i) => {
     const at = `segment ${i + 1}${s && s.label ? ` "${s.label}"` : ""}`;

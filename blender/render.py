@@ -1,6 +1,11 @@
-"""Render only requested stills by default; an animation requires --animation explicitly.
+"""Render the Blender film: stills by default, frames of plan segments or the whole animation on request.
 
-blender -b _cad/blender/mini_factory_cell.blend --python blender/render.py -- --frames 76 361 901
+Plan exports (tools/export-blender.mjs default):
+  blender -b _cad/plan/mini_factory_cell.blend --python blender/render.py -- --stills            # middle frame of every segment
+  blender -b _cad/plan/mini_factory_cell.blend --python blender/render.py -- --segments 7 8 --samples 16 --percent 50
+      -> <export>/frames/s07/f_00000.png ... (the layout tools/film.mjs --frames-from reads; existing frames are kept)
+  blender -b _cad/plan/mini_factory_cell.blend --python blender/render.py -- --segments 1 14 --animation   # the film
+Linear exports: --frames N ... (stills) or --animation [--start --end].  A STOP_RENDER file in the export stops a run.
 """
 import argparse
 import bisect
@@ -77,10 +82,16 @@ def main():
     p.add_argument('--animation', action='store_true', help='explicit opt-in to long full-quality render')
     p.add_argument('--start', type=int, default=1); p.add_argument('--end', type=int)
     p.add_argument('--samples', type=int)
+    p.add_argument('--stills', action='store_true', help='plan export: the middle frame of every segment (or of --segments A B)')
+    p.add_argument('--segments', nargs=2, type=int, metavar=('A', 'B'), help='plan export: segments A..B')
+    p.add_argument('--percent', type=int, help='resolution percentage (default 50 for stills and previews, 100 with --animation)')
+    p.add_argument('--at', type=float, default=0.5, help='--stills: position inside each segment, 0..1 (default 0.5)')
     args = p.parse_args(sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else [])
     scene = bpy.context.scene; root = Path(scene['mfc_export_dir'])
     manifest = json.loads((root / 'manifest.json').read_text())
     install_deformations(scene); devices(scene)
+    if scene.get('mfc_timeline') == 'plan' and (args.stills or args.segments):
+        return render_plan(scene, root, manifest, args)
     scene.render.resolution_percentage = 100 if args.animation else 50
     scene.cycles.samples = args.samples or (48 if args.animation else 24)
     out = args.out or root / ('frames' if args.animation else 'previews'); out.mkdir(parents=True, exist_ok=True)
@@ -99,6 +110,41 @@ def main():
         scene.render.filepath = str(out / f'frame_{frame:04d}.png')
         bpy.ops.render.render(write_still=True)
         print('RENDERED', frame, scene.render.filepath, flush=True)
+
+
+def render_plan(scene, root, manifest, args):
+    segs = manifest['timeline']['segments']
+    lo, hi = args.segments or (segs[0]['n'], segs[-1]['n'])
+    chosen = [sg for sg in segs if lo <= sg['n'] <= hi]
+    if not chosen: raise ValueError(f'No plan segments {lo}..{hi} in this export ({segs[0]["n"]}..{segs[-1]["n"]})')
+    scene.render.resolution_percentage = args.percent or (100 if args.animation else 50)
+    scene.cycles.samples = args.samples or (64 if args.animation else 24)
+    jobs = []                                   # (frame, output path)
+    if args.stills:
+        out = args.out or root / 'previews'; out.mkdir(parents=True, exist_ok=True)
+        for sg in chosen:
+            f = sg['f0'] + min(sg['frames'] - 1, max(0, round(args.at * (sg['frames'] - 1))))
+            label = ''.join(c if c.isalnum() else '_' for c in sg['label']).strip('_').lower()
+            jobs.append((f, out / f"seg{sg['n']:02d}_{label}.png"))
+    else:
+        out = args.out or root / 'frames'
+        for sg in chosen:
+            d = out / sg['dir']; d.mkdir(parents=True, exist_ok=True)
+            jobs += [(f, d / f'f_{f - sg["f0"]:05d}.png') for f in range(sg['f0'], sg['f1'] + 1)]
+    print(f'PLAN_RENDER {len(jobs)} frames, segments {lo}..{hi}, {scene.render.resolution_percentage}% , {scene.cycles.samples} samples', flush=True)
+    import time
+    t0 = time.time(); done = 0
+    for frame, path in jobs:
+        if (root / 'STOP_RENDER').exists():
+            print('STOP_RENDER found; exiting without deleting it', flush=True); break
+        if not args.stills and path.exists():
+            continue
+        scene.frame_set(frame)
+        scene.render.filepath = str(path)
+        bpy.ops.render.render(write_still=True)
+        done += 1
+        print(f'RENDERED {frame} {path} {(time.time() - t0) / done:.2f} s/frame', flush=True)
+    print(f'PLAN_RENDER_DONE {done} frames in {time.time() - t0:.1f} s', flush=True)
 
 
 if __name__ == '__main__': main()
