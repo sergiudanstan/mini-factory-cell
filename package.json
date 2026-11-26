@@ -1,6 +1,6 @@
 {
   "name": "mini-factory-cell",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Browser digital twin of a small-factory assembly cell: 3 vibratory bowl feeders, an 8-station dial, a delta robot and an Epson T3-B401S SCARA",
   "type": "module",
